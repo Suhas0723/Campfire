@@ -49,6 +49,7 @@ Transcription and speech synthesis are plumbing. The product depends on reading 
 | Voice notes to text | ElevenLabs speech to text (`scribe_v2`) |
 | Narration audio | ElevenLabs |
 | Cross-trip memory | Backboard |
+| Nightly local tips | Muse Spark (Meta Model API) |
 | Playback | React (`frontend/`). The story map is drawn in `TripMap.jsx` from stored coordinates. `@react-google-maps/api` is installed and unused. |
 | Host | Vultr VPS |
 
@@ -157,6 +158,7 @@ Streams are Redis streams of one field, `data`, whose value is a JSON object.
 - Schema for groups, users, trips, messages (with an embedding column), locations, stories, side quests, and suggestions.
 - Inbound capture that stores messages only while a trip is active, and the command handling above. Voice notes are queued for ElevenLabs speech to text.
 - Story loop. After the local recap hour, an active trip with messages from that calendar day becomes a nightly story: ChatGPT writes playback segments, ElevenLabs speaks the narration as Ogg Opus, and the group gets a voice note. The same ElevenLabs key transcribes voice notes. `/campfire end` assembles a `kind: "full"` story for the playback page. Place coordinates on those segments are the model's estimates. If ChatGPT is unset, or ElevenLabs cannot speak the narration, the story is marked `failed` and the group gets a short text note.
+- Nightly local tips. After the day recap, Campfire reads that day's chat vibe (mood, energy, `suggest_mode`) and dietary notes, then asks **Muse Spark** (Meta Model API) for tomorrow's restaurants, activities, and fun near the trip location. The voice note includes a short vibe-matched "for tomorrow" line, and WhatsApp gets a text list. Without `MUSE_API_KEY`, or when Muse fails, the night still posts the day recap alone.
 - Clients for ChatGPT and ElevenLabs are used by that loop.
 - Cross-trip memory. Each WhatsApp group gets one Backboard assistant, named `campfire:<group jid>`. Before a nightly or full story, the prompt gets that group's closest memories under "Known about this group". The model returns new nicknames, jokes, and sentiment in `memories`, and each one is saved after the story is. Without `BACKBOARD_API_KEY`, or when Backboard fails, stories are written from the chat alone.
 - Playback walks story segments over an illustrated map in `frontend/src/windows/TripMap.jsx`. `GOOGLE_MAPS_API_KEY` does not change that page.

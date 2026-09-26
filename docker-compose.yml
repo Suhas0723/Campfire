@@ -5,8 +5,6 @@ services:
       POSTGRES_USER: campfire
       POSTGRES_PASSWORD: campfire
       POSTGRES_DB: campfire
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,8 +15,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -33,7 +29,7 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       MEDIA_DIR: /data/media
-      PUBLIC_APP_URL: http://localhost:5173
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:5173}
       SECRET_KEY: ${SECRET_KEY:-dev-change-me}
       DEMO_MODE: ${DEMO_MODE:-false}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
@@ -49,8 +45,6 @@ services:
       ELEVENLABS_STT_MODEL_ID: ${ELEVENLABS_STT_MODEL_ID:-scribe_v2}
       BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
       BACKBOARD_BASE_URL: ${BACKBOARD_BASE_URL:-}
-    ports:
-      - "5000:5000"
     volumes:
       - media_data:/data/media
     depends_on:
@@ -98,16 +92,9 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
-    environment:
-      VITE_PROXY_TARGET: http://backend:5000
-      VITE_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
-      CHOKIDAR_USEPOLLING: "true"
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
+    build:
+      context: ./frontend
+      target: production
     depends_on:
       - backend
 
@@ -115,4 +102,3 @@ volumes:
   postgres_data:
   media_data:
   whatsapp_auth:
-  frontend_node_modules:

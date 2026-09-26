@@ -7,12 +7,15 @@ This repository captures a WhatsApp trip, writes the nightly recap and the full 
 ## Layout
 
 ```
-whatsapp-service/   Node + Baileys — WhatsApp session and Redis bridge
-backend/            Flask, Postgres/pgvector, Celery, model clients
-frontend/           React playback app (Vite)
-docs/               Product and architecture notes
-scripts/            Local start helpers
-docker-compose.yml
+whatsapp-service/           Node + Baileys — WhatsApp session and Redis bridge
+backend/                    Flask, Postgres/pgvector, Celery, model clients
+frontend/                   React playback app (Vite)
+docs/                       Product and architecture notes
+scripts/                    Local and VPS start helpers
+deploy/                     Caddy site config for the VPS
+docker-compose.yml          Shared stack (no host ports)
+docker-compose.override.yml Local ports and the Vite dev server
+docker-compose.prod.yml     HTTPS on a VPS
 ```
 
 ## Run it
@@ -44,7 +47,25 @@ Copy `.env.example` to `.env` when you add ChatGPT, ElevenLabs, or Backboard key
 | Postgres | localhost:5432 (`campfire` / `campfire`) |
 | Redis | localhost:6379 |
 
-On Windows, `scripts/dev.ps1` copies `.env.example` when `.env` is missing and starts Compose. On the VPS, `scripts/dev.sh` does the same.
+On Windows, `scripts/dev.ps1` copies `.env.example` when `.env` is missing and starts Compose. On Linux and macOS, `scripts/dev.sh` does the same. Both use the dev override, which publishes the ports above and runs the Vite server.
+
+## Run it on a Vultr VPS
+
+The dashboard and the WhatsApp agent can stay up on a VPS so your laptop can be off. Use Ubuntu 24.04, 2 GB of RAM (4 GB is safer while images build), and an SSH key. In the Vultr firewall, allow only ports 22, 80, and 443.
+
+1. Create an A record for your hostname (for example `campfire.example.com`) pointing at the VPS IP. Wait until it resolves before starting the stack, or certificate issuance fails.
+2. Install Docker Engine and the Compose plugin.
+3. Clone this repo and copy `.env.example` to `.env`. Set `SITE_ADDRESS` to the hostname only, `PUBLIC_APP_URL` to `https://` plus that hostname, `SESSION_COOKIE_SECURE=true`, a long random `SECRET_KEY`, and your OpenAI and ElevenLabs keys.
+4. Run `scripts/prod.sh`. Caddy listens on ports 80 and 443 and requests a Let's Encrypt certificate. Postgres, Redis, and the API are not published on the host.
+5. Stop the stack on your laptop once the VPS is up. Two Baileys sessions on the same number will both ingest the group and can double-post recaps.
+
+Link WhatsApp once. The session is stored in the `whatsapp_auth` volume and survives reboots.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f whatsapp
+```
+
+Scan the QR code from WhatsApp on the spare number: Linked devices. Wait for `WhatsApp connected`, then disconnect. Open `https://campfire.example.com` on your phone. Playback links from `/campfire end` use `PUBLIC_APP_URL`, so they point at that same host. If WhatsApp later logs the session out, clear the `whatsapp_auth` volume and scan again.
 
 ## WhatsApp commands
 

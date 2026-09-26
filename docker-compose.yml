@@ -99,8 +99,12 @@ services:
     environment:
       VITE_PROXY_TARGET: http://backend:5000
       VITE_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      CHOKIDAR_USEPOLLING: "true"
     ports:
       - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
     depends_on:
       - backend
 
@@ -108,3 +112,4 @@ volumes:
   postgres_data:
   media_data:
   whatsapp_auth:
+  frontend_node_modules:

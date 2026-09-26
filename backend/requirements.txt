@@ -9,5 +9,6 @@ redis>=5.2,<6
 python-dotenv>=1.0,<2
 openai>=1.70,<3
 requests>=2.32,<3
+backboard-sdk>=1.5,<2
 gunicorn>=23,<24
 phonenumbers>=8.13,<10

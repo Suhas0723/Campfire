@@ -157,7 +157,8 @@ Streams are Redis streams of one field, `data`, whose value is a JSON object.
 - Schema for groups, users, trips, messages (with an embedding column), locations, stories, side quests, and suggestions.
 - Inbound capture that stores messages only while a trip is active, and the command handling above. Voice notes are queued for ElevenLabs speech to text.
 - Story loop. After the local recap hour, an active trip with messages from that calendar day becomes a nightly story: ChatGPT writes playback segments, ElevenLabs speaks the narration as Ogg Opus, and the group gets a voice note. The same ElevenLabs key transcribes voice notes. `/campfire end` assembles a `kind: "full"` story for the playback page. Place coordinates on those segments are the model's estimates. If ChatGPT is unset, or ElevenLabs cannot speak the narration, the story is marked `failed` and the group gets a short text note.
-- Clients for ChatGPT and ElevenLabs are used by that loop. Backboard has a remember/recall interface; its HTTP API is not wired.
+- Clients for ChatGPT and ElevenLabs are used by that loop.
+- Cross-trip memory. Each WhatsApp group gets one Backboard assistant, named `campfire:<group jid>`. Before a nightly or full story, the prompt gets that group's closest memories under "Known about this group". The model returns new nicknames, jokes, and sentiment in `memories`, and each one is saved after the story is. Without `BACKBOARD_API_KEY`, or when Backboard fails, stories are written from the chat alone.
 - Playback walks story segments over an illustrated map in `frontend/src/windows/TripMap.jsx`. `GOOGLE_MAPS_API_KEY` does not change that page.
 
 Same-day reactions are part of the recap prompt. Reactions on the recap voice note itself are not tied back yet, because the outbound bridge does not return the sent message id. Messages sent after that night's recap run are kept for the full story.
@@ -168,5 +169,4 @@ Same-day reactions are part of the recap prompt. Reactions on the recap voice no
 2. **Next-trip suggestions** — on end, write `Suggestion` rows from chat sentiment. The playback page already renders `body`.
 3. **Side quests** — the `SideQuest` model and `campfire:awaiting_dm` helpers exist. A direct message is still logged and ignored. Detection, the private question, and keep-private or share come after stories exist.
 4. **Anniversaries** — the daily job can see which trips are due. It does not post the callback or set `anniversary_sent_at`.
-5. **Backboard** — wire remember/recall into later story prompts for jokes, nicknames, and sentiment across trips.
-6. **Playback auth** — the link stays the unguessed trip id until it is shared outside the group.
+5. **Playback auth** — the link stays the unguessed trip id until it is shared outside the group.

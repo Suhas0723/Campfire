@@ -1,0 +1,11 @@
+.git
+.cursor
+**/.env
+**/.env.*
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+**/.venv
+**/venv
+media

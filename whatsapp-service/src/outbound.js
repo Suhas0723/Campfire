@@ -29,6 +29,18 @@ function resolveAudio(audioPath) {
 }
 
 async function sendOne(sock, payload) {
+  if (payload.type === "poll" && payload.poll) {
+    const values = (payload.poll.values || []).map((value) => String(value).trim()).filter(Boolean).slice(0, 12);
+    if (values.length < 2) throw new Error("Poll needs at least two options");
+    await sock.sendMessage(payload.group_jid, {
+      poll: {
+        name: String(payload.poll.name || "Where should the next fire be?").slice(0, 255),
+        values,
+        selectableCount: 1,
+      },
+    });
+    return;
+  }
   if (payload.type === "audio" && payload.audio_path) {
     const audio = await fs.readFile(resolveAudio(payload.audio_path));
     const opus = String(payload.audio_path).toLowerCase().endsWith(".ogg");

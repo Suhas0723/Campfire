@@ -24,7 +24,8 @@ export function useMyTrips() {
 }
 
 // Map scenery is seeded from trip.id, so the demo trips keep the seeds they were drawn with.
-const withSceneKey = (data) => (data.trip?.scene_key ? { ...data, trip: { ...data.trip, id: data.trip.scene_key } } : data);
+const withSceneKey = (data) =>
+  data.trip?.scene_key ? { ...data, trip: { ...data.trip, record_id: data.trip.id, id: data.trip.scene_key } } : data;
 
 // tripId: undefined while still resolving, null when the user has no such trip.
 export function usePlayback(tripId) {

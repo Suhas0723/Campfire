@@ -21,12 +21,14 @@ def publish_outbound(
     message_type: str,
     text: str | None = None,
     audio_path: str | None = None,
+    poll: dict | None = None,
 ) -> None:
     payload = {
         "group_jid": group_jid,
         "type": message_type,
         "text": text,
         "audio_path": audio_path,
+        "poll": poll,
     }
     client().xadd(OUTBOUND_STREAM, {"data": json.dumps(payload)})
 

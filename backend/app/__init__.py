@@ -61,6 +61,11 @@ def init_database(seed_demo: bool = False):
                 db.session.execute(
                     text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS details JSONB NOT NULL DEFAULT '{}'::jsonb")
                 )
+                db.session.execute(
+                    text(
+                        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS choices JSONB NOT NULL DEFAULT '[]'::jsonb"
+                    )
+                )
                 if seed_demo:
                     from app.seed_demo import seed
 

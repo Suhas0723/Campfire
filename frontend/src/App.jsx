@@ -153,10 +153,14 @@ function Workspace() {
 
   const close = useCallback(
     (id) => {
-      setOpen((ws) => ws.filter((w) => w.id !== id));
+      setOpen((ws) => {
+        const next = ws.filter((w) => w.id !== id);
+        if (mobile && next.length === 0) return [{ id: 'fires', pos: initialPos('fires') }];
+        return next;
+      });
       if (id === playerWindow && playingId) exitPlayer();
     },
-    [playingId, playerWindow, exitPlayer],
+    [playingId, playerWindow, exitPlayer, mobile],
   );
 
   const move = useCallback((id, pos) => setOpen((ws) => ws.map((w) => (w.id === id ? { ...w, pos } : w))), []);

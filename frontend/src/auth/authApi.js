@@ -30,3 +30,4 @@ export const getMe = () => send('/me');
 export const listMyTrips = () => send('/trips');
 export const getTripPlayback = (tripId) => send(`/trips/${tripId}/playback`);
 export const endNight = (tripId) => send(`/trips/${tripId}/end-night`, { method: 'POST', body: {} });
+export const sendTripPoll = (tripId) => send(`/trips/${tripId}/poll`, { method: 'POST', body: {} });

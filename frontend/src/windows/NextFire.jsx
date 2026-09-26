@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sendTripPoll } from '../auth/authApi.js';
 import { blob, roughPoly, c } from '../scene/shape.js';
 import { CompassIcon, FlameLogo, PinIcon } from '../ui/icons.jsx';
 
@@ -29,7 +30,9 @@ function Postcard() {
 }
 
 export default function NextFire({ data }) {
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
 
   if (data.status !== 'ready') return null;
   const [pick, ...others] = data.suggestions || [];
@@ -44,8 +47,21 @@ export default function NextFire({ data }) {
   }
 
   const alternatives = [...others.map((s) => s.body), ...(pick.alternatives || [])];
-  const options = [pick.body, ...alternatives];
+  const options = sent?.options || [pick.body, ...alternatives];
   const chips = [pick.drive, pick.when].filter(Boolean);
+
+  const sendPoll = async () => {
+    if (sending) return;
+    setSending(true);
+    setError('');
+    try {
+      setSent(await sendTripPoll(data.trip.record_id || data.trip.id));
+    } catch (err) {
+      setError(err.message || 'Could not send the poll.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="nextfire">
@@ -100,16 +116,18 @@ export default function NextFire({ data }) {
               </li>
             ))}
           </ul>
-          <button className="text-button" onClick={() => setSent(false)}>
-            Undo
-          </button>
         </div>
       ) : (
         <div className="nextfire-actions">
-          <button className="btn-primary lg" onClick={() => setSent(true)}>
-            Send to the group as a poll
+          <button className="btn-primary lg" type="button" onClick={sendPoll} disabled={sending}>
+            {sending ? 'Sending the poll…' : 'Send to the group as a poll'}
           </button>
           {alternatives.length > 0 && <span className="nextfire-hint">Also in the poll: {alternatives.join(', ')}</span>}
+          {error && (
+            <p className="nextfire-hint" role="alert">
+              {error}
+            </p>
+          )}
         </div>
       )}
     </div>

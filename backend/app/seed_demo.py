@@ -98,7 +98,14 @@ def seed() -> None:
         if data.get("segments"):
             db.session.add(Story(trip=trip, kind="full", title=data["name"], status="ready", segments=data["segments"]))
         for item in data.get("suggestions", []):
-            db.session.add(Suggestion(trip=trip, body=item["body"], rationale=item.get("rationale", "")))
+            choices = []
+            for raw in item.get("alternatives") or []:
+                choice = " ".join(str(raw or "").split())[:100]
+                if choice and choice not in choices:
+                    choices.append(choice)
+            db.session.add(
+                Suggestion(trip=trip, body=item["body"], rationale=item.get("rationale", ""), choices=choices[:11])
+            )
         db.session.flush()
 
 

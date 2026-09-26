@@ -156,6 +156,7 @@ class Suggestion(db.Model):
     trip_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trips.id"), nullable=False, index=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     rationale: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    choices: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     trip: Mapped[Trip] = relationship(back_populates="suggestions")

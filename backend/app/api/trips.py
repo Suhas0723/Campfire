@@ -6,6 +6,7 @@ from sqlalchemy import nulls_last
 from app.auth import current_user, login_required, trip_for_current_user, trips_for
 from app.extensions import db
 from app.models import Story, Suggestion, Trip
+from app.redis_streams import publish_outbound
 from app.services.story import prepare_end_night
 
 bp = Blueprint("trips", __name__)
@@ -97,9 +98,51 @@ def playback(trip_id):
             "trip": trip.to_dict(),
             "locations": [location.to_dict() for location in _ordered_locations(trip)],
             "segments": _segments_for(trip),
-            "suggestions": [{"body": item.body, "rationale": item.rationale} for item in suggestions],
+            "suggestions": [
+                {"body": item.body, "rationale": item.rationale, "alternatives": list(item.choices or [])}
+                for item in suggestions
+            ],
         }
     )
+
+
+def _poll_options(suggestions: list[Suggestion]) -> list[str]:
+    options = []
+    for item in suggestions:
+        for raw in [item.body, *(item.choices or [])]:
+            text = " ".join(str(raw or "").split())[:100]
+            if text and text not in options:
+                options.append(text)
+            if len(options) >= 12:
+                return options
+    if len(options) == 1:
+        options.append("Somewhere else")
+    return options
+
+
+@bp.post("/trips/<uuid:trip_id>/poll")
+@login_required
+def send_poll(trip_id):
+    """Post the Next fire choices to the trip's WhatsApp group as a poll."""
+    trip = trip_for_current_user(trip_id)
+    if trip is None:
+        return jsonify(NOT_FOUND), 404
+    group = trip.group
+    jid = group.whatsapp_jid if group else ""
+    if not jid.endswith("@g.us") or jid.startswith("demo-"):
+        return jsonify({"error": "This trip is not linked to a WhatsApp group.", "code": "no_group"}), 400
+    suggestions = (
+        db.session.query(Suggestion).filter_by(trip_id=trip.id).order_by(Suggestion.created_at.asc()).all()
+    )
+    options = _poll_options(suggestions)
+    if len(options) < 2:
+        return jsonify({"error": "No suggestion to put in a poll yet.", "code": "no_suggestion"}), 409
+    publish_outbound(
+        jid,
+        message_type="poll",
+        poll={"name": "Where should the next fire be?", "values": options},
+    )
+    return jsonify({"status": "queued", "group_name": group.name or trip.name, "options": options})
 
 
 @bp.post("/trips/<uuid:trip_id>/end-night")

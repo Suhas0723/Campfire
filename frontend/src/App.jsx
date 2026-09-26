@@ -149,9 +149,9 @@ function Workspace() {
     setNightNote('');
     try {
       const result = await endNight(activeTrip.id);
-      if (result.status === 'already_done') setNightNote('Tonight’s recap is already in the chat.');
-      else if (result.status === 'in_progress') setNightNote('Tonight’s recap is already running.');
-      else setNightNote('Recap and tomorrow ideas are on the way in WhatsApp.');
+      if (result.status === 'already_done') setNightNote('Tonight’s recap is already in the chat. The trip is still open.');
+      else if (result.status === 'in_progress') setNightNote('Tonight’s recap is already running. The trip stays open.');
+      else setNightNote('Recap is on the way in WhatsApp. The trip stays open until /campfire end.');
     } catch (error) {
       if (error.code === 'no_messages') setNightNote('Nothing captured today yet.');
       else setNightNote('Couldn’t end the night. Try again.');

@@ -17,9 +17,11 @@ function TripRow({ trip, tilt, onPlay }) {
           {trip.title}
         </h2>
         <p className="fire-row-meta">
+          {trip.status === 'active' ? 'Still going' : trip.status === 'paused' ? 'Paused' : 'Closed'}
+          {(trip.location_name || trip.started_at) && <span className="dot" />}
           {trip.location_name}
           {trip.location_name && trip.started_at && <span className="dot" />}
-          {formatDateRange(trip.started_at, trip.ended_at)}
+          {formatDateRange(trip.started_at, trip.status === 'active' || trip.status === 'paused' ? null : trip.ended_at)}
         </p>
         <ul className="crew-dots" aria-label={`With ${trip.participants.join(', ')}`}>
           {trip.participants.map((name) => (

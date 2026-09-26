@@ -47,7 +47,12 @@ def init_database():
         try:
             db.session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             db.session.commit()
-            db.create_all()
+            db.session.execute(text("SELECT pg_advisory_lock(8675309)"))
+            try:
+                db.create_all()
+            finally:
+                db.session.execute(text("SELECT pg_advisory_unlock(8675309)"))
+                db.session.commit()
             return
         except OperationalError as exc:
             db.session.rollback()

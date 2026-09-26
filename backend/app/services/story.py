@@ -102,32 +102,67 @@ def run_due_recaps() -> int:
     started = 0
     trips = db.session.query(Trip).filter_by(status=ACTIVE).all()
     for trip in trips:
-        day = now.date()
-        story = (
-            db.session.query(Story)
-            .filter_by(trip_id=trip.id, kind="nightly", for_date=day)
-            .first()
-        )
-        if story is None:
-            if not _messages_for_day(trip.id, day):
-                continue
-            story = Story(
-                trip_id=trip.id,
-                kind="nightly",
-                for_date=day,
-                title=day.isoformat(),
-                status="pending",
-            )
-            db.session.add(story)
-            db.session.commit()
-        if story.status != "pending":
+        outcome = _queue_nightly(trip, now.date())
+        if outcome.get("status") != "queued":
             continue
         try:
-            fill_nightly(str(story.id))
+            fill_nightly(outcome["story_id"])
         except Exception:
             logger.exception("Nightly recap did not finish for trip %s", trip.id)
         started += 1
     return started
+
+
+def end_night_now(trip_id: str) -> dict:
+    """Run today's nightly recap and Muse tips now, without waiting for the recap hour."""
+    trip = db.session.get(Trip, uuid.UUID(trip_id))
+    if trip is None:
+        return {"status": "missing"}
+    if trip.status != ACTIVE:
+        return {"status": "not_active"}
+    day = datetime.now(_zone()).date()
+    outcome = _queue_nightly(trip, day)
+    if outcome.get("status") != "queued":
+        return outcome
+    fill_nightly(outcome["story_id"])
+    story = db.session.get(Story, uuid.UUID(outcome["story_id"]))
+    status = story.status if story is not None else "failed"
+    return {"status": "ready" if status == "ready" else status, "date": day.isoformat()}
+
+
+def _queue_nightly(trip: Trip, day: date) -> dict:
+    """Ensure today's nightly story is pending. Returns queued, already_done, in_progress, or no_messages."""
+    story = (
+        db.session.query(Story)
+        .filter_by(trip_id=trip.id, kind="nightly", for_date=day)
+        .first()
+    )
+    if story is not None and story.status == "ready":
+        return {"status": "already_done", "date": day.isoformat()}
+    if story is not None and story.status == "building":
+        return {"status": "in_progress", "date": day.isoformat()}
+    if not _messages_for_day(trip.id, day):
+        return {"status": "no_messages", "date": day.isoformat()}
+    if story is None:
+        story = Story(
+            trip_id=trip.id,
+            kind="nightly",
+            for_date=day,
+            title=day.isoformat(),
+            status="pending",
+        )
+        db.session.add(story)
+    elif story.status != "pending":
+        story.status = "pending"
+    db.session.commit()
+    return {"status": "queued", "date": day.isoformat(), "story_id": str(story.id)}
+
+
+def prepare_end_night(trip: Trip) -> dict:
+    """Check whether tonight's recap can start now. Queues a pending story when it can."""
+    if trip.status != ACTIVE:
+        return {"status": "not_active"}
+    return _queue_nightly(trip, datetime.now(_zone()).date())
 
 
 def fill_nightly(story_id: str) -> None:

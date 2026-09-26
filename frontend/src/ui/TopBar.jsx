@@ -8,7 +8,7 @@ const NAV = [
   { id: 'next', label: 'Next fire' },
 ];
 
-export default function TopBar({ onOpen, canOpen = () => true }) {
+export default function TopBar({ onOpen, canOpen = () => true, onEndNight, endingNight, nightNote }) {
   return (
     <header className="topbar">
       <button className="brand" onClick={() => onOpen('fires')}>
@@ -23,6 +23,12 @@ export default function TopBar({ onOpen, canOpen = () => true }) {
         ))}
       </nav>
       <div className="topbar-right">
+        {onEndNight && (
+          <button className="btn-night" type="button" onClick={onEndNight} disabled={endingNight}>
+            {endingNight ? 'Ending the night…' : 'End the night'}
+          </button>
+        )}
+        {nightNote && <span className="night-note">{nightNote}</span>}
         <button className="btn-primary" onClick={() => onOpen('start')}>
           Start a trip
         </button>

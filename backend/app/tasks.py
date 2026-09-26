@@ -6,7 +6,7 @@ from app.celery_app import celery
 from app.extensions import db
 from app.models import ENDED, Message, Trip
 from app.services.llm import IntegrationNotConfigured
-from app.services.story import assemble_full, run_due_recaps
+from app.services.story import assemble_full, end_night_now, run_due_recaps
 from app.services.transcription import transcribe
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,12 @@ def transcribe_message(self, message_id: str) -> None:
 def generate_due_recaps():
     """Assemble a nightly recap once local time passes the recap hour."""
     return run_due_recaps()
+
+
+@celery.task(name="campfire.end_night")
+def end_night(trip_id: str) -> dict:
+    """Same nightly recap and Muse tips as the scheduled job, started early from the app."""
+    return end_night_now(trip_id)
 
 
 @celery.task(name="campfire.assemble_full_story")

@@ -6,6 +6,7 @@ from sqlalchemy import nulls_last
 from app.auth import current_user, login_required, trip_for_current_user, trips_for
 from app.extensions import db
 from app.models import Story, Suggestion, Trip
+from app.services.story import prepare_end_night
 
 bp = Blueprint("trips", __name__)
 
@@ -99,3 +100,35 @@ def playback(trip_id):
             "suggestions": [{"body": item.body, "rationale": item.rationale} for item in suggestions],
         }
     )
+
+
+@bp.post("/trips/<uuid:trip_id>/end-night")
+@login_required
+def end_night_early(trip_id):
+    """Start today's nightly recap and Muse tips before the scheduled hour."""
+    trip = trip_for_current_user(trip_id)
+    if trip is None:
+        return jsonify(NOT_FOUND), 404
+    outcome = prepare_end_night(trip)
+    status = outcome.get("status")
+    if status == "queued":
+        from app.tasks import end_night
+
+        end_night.delay(str(trip.id))
+        return jsonify({"status": "started", "date": outcome.get("date")}), 202
+    codes = {
+        "already_done": 200,
+        "in_progress": 202,
+        "no_messages": 409,
+        "not_active": 409,
+    }
+    messages = {
+        "no_messages": "Nothing captured today yet.",
+        "not_active": "This trip is not active.",
+        "already_done": "Tonight’s recap is already in the chat.",
+        "in_progress": "Tonight’s recap is already running.",
+    }
+    body = {**outcome, "code": status}
+    if status in messages:
+        body["error"] = messages[status]
+    return jsonify(body), codes.get(status, 409)

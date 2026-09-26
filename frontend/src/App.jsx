@@ -14,6 +14,7 @@ import NextFire from './windows/NextFire.jsx';
 import { NightlyRecaps, OffTheRecord, Settings, SideQuests, StartTrip } from './windows/Extras.jsx';
 import { KYOTO_TRIP } from './scenes/kyoto/index.js';
 import { useMyTrips, usePlayback } from './auth/useMyTrips.js';
+import { endNight } from './auth/authApi.js';
 import YourFires from './auth/YourFires.jsx';
 
 const fromRight = (w, y) => () => ({ x: Math.max(130, window.innerWidth - w - 130), y });
@@ -138,9 +139,36 @@ function Workspace() {
     if (desert) playTrip(desert);
   }, [desert, playTrip]);
 
+  const activeTrip = trips.find((trip) => trip.status === 'active');
+  const [endingNight, setEndingNight] = useState(false);
+  const [nightNote, setNightNote] = useState('');
+
+  const endTheNight = useCallback(async () => {
+    if (!activeTrip || endingNight) return;
+    setEndingNight(true);
+    setNightNote('');
+    try {
+      const result = await endNight(activeTrip.id);
+      if (result.status === 'already_done') setNightNote('Tonight’s recap is already in the chat.');
+      else if (result.status === 'in_progress') setNightNote('Tonight’s recap is already running.');
+      else setNightNote('Recap and tomorrow ideas are on the way in WhatsApp.');
+    } catch (error) {
+      if (error.code === 'no_messages') setNightNote('Nothing captured today yet.');
+      else setNightNote('Couldn’t end the night. Try again.');
+    } finally {
+      setEndingNight(false);
+    }
+  }, [activeTrip, endingNight]);
+
   return (
     <>
-      <TopBar onOpen={openFromUi} canOpen={canOpen} />
+      <TopBar
+        onOpen={openFromUi}
+        canOpen={canOpen}
+        onEndNight={activeTrip ? endTheNight : null}
+        endingNight={endingNight}
+        nightNote={nightNote}
+      />
       <Desktop openIds={open.map((w) => w.id)} onOpen={openFromUi} labels={{ trip: tripName }} canOpen={canOpen} />
       {open.map((w, i) => {
         const cfg = WINDOWS[w.id];

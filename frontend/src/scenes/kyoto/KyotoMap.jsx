@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { blob, rng, roughPoly, c } from '../../scene/shape.js';
+import { frameViewBox, readableScales, useMapFrame } from '../../windows/mapFrame.js';
 import { ArchedBridge, BambooCluster, CherryTree, Pagoda, StoneLantern, ToriiGate } from './Landmarks.jsx';
 import './kyoto.css';
 
@@ -110,20 +111,52 @@ function GreenHill({ x, y, w, h, seed }) {
   );
 }
 
-function Stop({ stop, index, active, visited }) {
+function labelFits(stop, labelW, box, scales) {
+  if (!box) return true;
+  const half = (labelW * scales.label) / 2 + 8;
+  const top = stop.y + 20 * scales.marker;
+  const bottom = top + 28 * scales.label;
+  return stop.x - half >= box.x && stop.x + half <= box.x + box.w && top >= box.y && bottom <= box.y + box.h;
+}
+
+function Stop({ stop, index, active, visited, scales = null, box = null }) {
   const labelW = stop.name.length * 9 + 26;
+  const showLabel = !scales || active || labelFits(stop, labelW, box, scales);
+  if (!scales) {
+    return (
+      <g transform={`translate(${stop.x} ${stop.y})`}>
+        {active && <circle r="22" className="map-stop-pulse" style={{ fill: c('fire-yellow'), opacity: 0.5 }} />}
+        <circle r="11" style={{ ...OUT, fill: visited ? c('fire-orange') : c('cream') }} {...sw(2.5)} />
+        <text y="4.5" textAnchor="middle" className="map-stop-num">
+          {index + 1}
+        </text>
+        <g transform="translate(0 36)">
+          <rect x={-labelW / 2} y="-15" width={labelW} height="28" rx="6" style={{ ...OUT, fill: active ? c('fire-yellow') : c('parchment') }} {...sw(2)} />
+          <text y="5" textAnchor="middle" className="map-stop-label">
+            {stop.name}
+          </text>
+        </g>
+      </g>
+    );
+  }
   return (
     <g transform={`translate(${stop.x} ${stop.y})`}>
-      {active && <circle r="22" className="map-stop-pulse" style={{ fill: c('fire-yellow'), opacity: 0.5 }} />}
-      <circle r="11" style={{ ...OUT, fill: visited ? c('fire-orange') : c('cream') }} {...sw(2.5)} />
-      <text y="4.5" textAnchor="middle" className="map-stop-num">
-        {index + 1}
-      </text>
-      <g transform="translate(0 36)">
-        <rect x={-labelW / 2} y="-15" width={labelW} height="28" rx="6" style={{ ...OUT, fill: active ? c('fire-yellow') : c('parchment') }} {...sw(2)} />
-        <text y="5" textAnchor="middle" className="map-stop-label">
-          {stop.name}
+      <g transform={`scale(${scales.marker})`}>
+        {active && <circle r="22" className="map-stop-pulse" style={{ fill: c('fire-yellow'), opacity: 0.5 }} />}
+        <circle r="11" style={{ ...OUT, fill: visited ? c('fire-orange') : c('cream') }} {...sw(2.5)} />
+        <text y="4.5" textAnchor="middle" className="map-stop-num">
+          {index + 1}
         </text>
+      </g>
+      <g transform={`translate(0 ${36 * scales.marker}) scale(${scales.label})`}>
+        {showLabel && (
+          <>
+            <rect x={-labelW / 2} y="-15" width={labelW} height="28" rx="6" style={{ ...OUT, fill: active ? c('fire-yellow') : c('parchment') }} {...sw(2)} />
+            <text y="5" textAnchor="middle" className="map-stop-label">
+              {stop.name}
+            </text>
+          </>
+        )}
       </g>
     </g>
   );
@@ -198,18 +231,27 @@ function Petals() {
   );
 }
 
-export default function KyotoMap({ stops, position, activeIndex }) {
+export default function KyotoMap({ stops, position, activeIndex, frame = false }) {
   const points = useMemo(() => project(stops), [stops]);
   const legs = useMemo(() => buildLegs(points), [points]);
   const scenery = useMemo(() => {
-    const placed = points.flatMap((p, i) => (STOP_ART[i] || []).map(({ dx, dy, ...rest }) => ({ ...rest, x: p.x + dx, y: p.y + dy })));
+    const placed = points.flatMap((p, i) => (STOP_ART[i % STOP_ART.length] || []).map(({ dx, dy, ...rest }) => ({ ...rest, x: p.x + dx, y: p.y + dy })));
     return [...DECOR, ...placed].sort((a, b) => a.y - b.y);
   }, [points]);
   const route = legsPath(legs);
   const marker = markerAt(points, legs, position);
+  const focus = frame && points.length ? points[Math.min(points.length - 1, Math.max(0, activeIndex))] : null;
+  const { hostRef, box } = useMapFrame(Boolean(focus), focus);
+  const scales = frame && box ? readableScales(box.px) : null;
 
   return (
-    <svg className="trip-map kyoto-map" viewBox={`-40 -10 ${W + 80} ${H + 20}`} preserveAspectRatio="xMidYMid meet" aria-label="Illustrated map of Kyoto">
+    <svg
+      ref={hostRef}
+      className={frame ? 'trip-map kyoto-map is-framed' : 'trip-map kyoto-map'}
+      viewBox={box ? frameViewBox(box) : `-40 -10 ${W + 80} ${H + 20}`}
+      preserveAspectRatio={frame ? 'xMidYMid slice' : 'xMidYMid meet'}
+      aria-label="Illustrated map of Japan"
+    >
       <defs>
         <pattern id="kyoto-hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
           <path d="M0,0 L0,10" style={{ stroke: c('pine'), opacity: 0.3 }} strokeWidth="2" />
@@ -233,7 +275,7 @@ export default function KyotoMap({ stops, position, activeIndex }) {
         <Kind key={i} {...rest} />
       ))}
 
-      <g transform="translate(70 70)">
+      <g className="map-compass" transform="translate(70 70)">
         <circle r="30" style={{ ...OUT, fill: c('cream') }} {...sw(2)} />
         <path d="M0,-26 L6,0 L0,26 L-6,0Z" style={{ ...OUT, fill: c('wood-light') }} {...sw(1.6)} />
         <path d="M0,-26 L6,0 L-6,0Z" style={{ ...OUT, fill: c('fire-red') }} {...sw(1.6)} />
@@ -250,11 +292,11 @@ export default function KyotoMap({ stops, position, activeIndex }) {
       )}
 
       {points.map((s, i) => (
-        <Stop key={`${s.name}-${i}`} stop={s} index={i} active={i === activeIndex} visited={i <= activeIndex} />
+        <Stop key={`${s.name}-${i}`} stop={s} index={i} active={i === activeIndex} visited={i <= activeIndex} scales={scales} box={box} />
       ))}
 
       {marker && (
-        <g transform={`translate(${marker.x} ${marker.y})`}>
+        <g transform={scales ? `translate(${marker.x} ${marker.y}) scale(${scales.marker})` : `translate(${marker.x} ${marker.y})`}>
           <ellipse cy="4" rx="14" ry="5" style={{ fill: c('bark-dark'), opacity: 0.3 }} />
           <g transform="translate(0 -14)">
             <path

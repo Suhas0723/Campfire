@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TripMap from './TripMap.jsx';
 import StoryIntroGlobe from './StoryIntroGlobe.jsx';
+import MobilePlayer from './MobilePlayer.jsx';
 import { FlameLogo, PauseIcon, PlayIcon } from '../ui/icons.jsx';
+import useIsMobile from '../ui/useIsMobile.js';
 import { estimateMs, formatClock, stopIndexAt, storyStops } from '../data/trip.js';
 
 const BARS = [0.4, 0.8, 0.55, 1, 0.7, 0.35, 0.9, 0.6, 0.45, 0.85, 0.5, 0.75, 0.3, 0.65];
@@ -174,6 +176,50 @@ function StoryPlayer({ data, onExit, MapView }) {
 
   const isVoice = segment.kind === 'voice_note';
   const speaker = isVoice ? segment.speaker || 'Voice note' : 'Campfire';
+  const { mobile, short } = useIsMobile();
+
+  if (mobile) {
+    return (
+      <MobilePlayer
+        trip={trip}
+        stops={stops}
+        intro={intro}
+        place={place}
+        onExit={onExit}
+        endIntro={endIntro}
+        mapRef={mapRef}
+        MapView={MapView}
+        position={Math.max(0, position)}
+        activeStop={activeStop}
+        segment={segment}
+        index={index}
+        playing={playing}
+        speaker={speaker}
+        isVoice={isVoice}
+        short={short}
+        usesAudio={usesAudio}
+        src={src}
+        narrator={narrator}
+        audioRef={audioRef}
+        setDurations={setDurations}
+        pendingSeek={pendingSeek}
+        setProgress={setProgress}
+        advance={advance}
+        setAudioFailed={setAudioFailed}
+        failKey={failKey}
+        togglePlay={togglePlay}
+        seek={seek}
+        elapsed={elapsed}
+        total={total}
+        lengths={lengths}
+        segments={segments}
+        canChooseVoice={canChooseVoice}
+        chooseNarrator={chooseNarrator}
+        formatClock={formatClock}
+        stopIndexAt={stopIndexAt}
+      />
+    );
+  }
 
   return (
     <div className="player">

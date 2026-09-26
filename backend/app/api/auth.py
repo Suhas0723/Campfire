@@ -7,7 +7,7 @@ import secrets
 
 from flask import Blueprint, current_app, jsonify, request, session
 
-from app.auth import current_user, login_required, normalize_phone, phone_to_jid, user_by_phone, user_to_dict
+from app.auth import current_user, ensure_user, login_required, normalize_phone, phone_to_jid, user_to_dict
 from app.redis_streams import LOGIN_CODE_STREAM, client
 
 bp = Blueprint("auth", __name__)
@@ -73,11 +73,11 @@ def request_code():
     pipe.expire(code_key, CODE_TTL)
     pipe.execute()
 
-    # Codes are stored for every number, but only people Campfire already knows get a message.
+    # The response is the same for every number. Outside demo mode the bot DMs the code.
     demo = current_app.config["DEMO_MODE"]
     if demo:
         logger.warning("DEMO_MODE login code for %s: %s", phone, code)
-    elif user_by_phone(phone) is not None:
+    else:
         job = {"jid": phone_to_jid(phone), "text": f"Your Campfire code is {code}. It expires in 10 minutes."}
         r.xadd(LOGIN_CODE_STREAM, {"data": json.dumps(job)}, maxlen=1000, approximate=True)
 
@@ -107,13 +107,13 @@ def verify():
     matches = hmac.compare_digest(stored, _hash(phone, code))
     if current_app.config["DEMO_MODE"] and code == DEMO_CODE:
         matches = True
-    user = user_by_phone(phone) if matches else None
-    if user is None:
+    if not matches:
         remaining = MAX_ATTEMPTS - attempts
         if remaining <= 0:
             return _error("too_many", "Too many attempts", 429)
         return _error("wrong", "That code doesn't match", 400, remaining=remaining)
 
+    user = ensure_user(phone)
     r.delete(f"auth:code:{phone}", f"auth:cooldown:{phone}")
     session.clear()
     session.permanent = True

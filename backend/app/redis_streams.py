@@ -8,6 +8,7 @@ OUTBOUND_STREAM = "campfire:outbound"
 INBOUND_GROUP = "backend"
 OUTBOUND_GROUP = "whatsapp"
 AWAITING_DM_KEY = "campfire:awaiting_dm"
+LOGIN_CODE_STREAM = "campfire:login_codes"
 
 
 def client() -> redis.Redis:

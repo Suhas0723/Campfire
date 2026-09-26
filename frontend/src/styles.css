@@ -767,6 +767,36 @@ button {
   display: block;
 }
 
+.map-layer,
+.intro-globe,
+.intro-globe svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.intro-globe {
+  background: var(--cream);
+}
+
+.intro-globe svg {
+  display: block;
+}
+
+.intro-globe ~ .map-layer {
+  clip-path: circle(0 at 50% 50%);
+}
+
+.player-exit.intro-skip {
+  top: auto;
+  bottom: 18px;
+}
+
+.player-controls.is-waiting {
+  opacity: 0.55;
+}
+
 .map-stop-num {
   font-family: var(--font-ui);
   font-weight: 800;
@@ -819,6 +849,7 @@ button {
   border-radius: 12px;
   box-shadow: 4px 4px 0 rgba(59, 36, 22, 0.3);
   text-align: center;
+  animation: fade-up 600ms ease-out 300ms both;
 }
 
 .player-heading .eyebrow {

@@ -1,0 +1,189 @@
+{
+  "slug": "desert",
+  "name": "Desert trip",
+  "status": "ended",
+  "started_at": "2026-03-13T20:00:00Z",
+  "ended_at": "2026-03-16T20:00:00Z",
+  "group_name": "Desert trip crew",
+  "details": {
+    "place": "Joshua Tree National Park",
+    "location": {
+      "name": "Joshua Tree",
+      "lat": 33.8734,
+      "lng": -115.901
+    },
+    "crew_order": [
+      "Ana",
+      "Priya",
+      "Marcus",
+      "Jules"
+    ],
+    "cover": {
+      "label": "Sunrise over Jumbo Rocks",
+      "by": "Ana",
+      "url": null
+    }
+  },
+  "locations": [
+    {
+      "id": "jumbo",
+      "name": "Jumbo Rocks",
+      "latitude": 33.9917,
+      "longitude": -116.0625
+    },
+    {
+      "id": "hidden",
+      "name": "Hidden Valley",
+      "latitude": 34.0126,
+      "longitude": -116.1686
+    },
+    {
+      "id": "arch",
+      "name": "Arch Rock",
+      "latitude": 33.987,
+      "longitude": -116.0167
+    },
+    {
+      "id": "ryan",
+      "name": "Ryan Mountain",
+      "latitude": 34.0257,
+      "longitude": -116.1363
+    }
+  ],
+  "segments": [
+    {
+      "order": 0,
+      "kind": "narration",
+      "text": "We rolled into Jumbo Rocks after dark, and the first tent went up inside out.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Jumbo Rocks",
+        "lat": 33.9917,
+        "lng": -116.0625
+      },
+      "speaker": null
+    },
+    {
+      "order": 1,
+      "kind": "voice_note",
+      "text": "Okay, who packed the instructions?",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Jumbo Rocks",
+        "lat": 33.9917,
+        "lng": -116.0625
+      },
+      "speaker": "Jules"
+    },
+    {
+      "order": 2,
+      "kind": "narration",
+      "text": "By morning Hidden Valley was glowing, and Priya and Jules were already lost in it.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Hidden Valley",
+        "lat": 34.0126,
+        "lng": -116.1686
+      },
+      "speaker": null
+    },
+    {
+      "order": 3,
+      "kind": "voice_note",
+      "text": "We are not lost. We are exploring.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Hidden Valley",
+        "lat": 34.0126,
+        "lng": -116.1686
+      },
+      "speaker": "Priya"
+    },
+    {
+      "order": 4,
+      "kind": "narration",
+      "text": "At Arch Rock, Marcus explained his s'mores theory to anyone who stood still.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Arch Rock",
+        "lat": 33.987,
+        "lng": -116.0167
+      },
+      "speaker": null
+    },
+    {
+      "order": 5,
+      "kind": "photo",
+      "text": "Arch Rock at golden hour. Everyone squinting, nobody complaining.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Arch Rock",
+        "lat": 33.987,
+        "lng": -116.0167
+      },
+      "speaker": "Jules"
+    },
+    {
+      "order": 6,
+      "kind": "narration",
+      "text": "On Ryan Mountain the wind took Jules's hat, and nobody has let him forget it.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Ryan Mountain",
+        "lat": 34.0257,
+        "lng": -116.1363
+      },
+      "speaker": null
+    },
+    {
+      "order": 7,
+      "kind": "voice_note",
+      "text": "Somebody get a photo of this. Not me, for once.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Ryan Mountain",
+        "lat": 34.0257,
+        "lng": -116.1363
+      },
+      "speaker": "Ana"
+    }
+  ],
+  "suggestions": [
+    {
+      "body": "Anza-Borrego, two hours closer and free to park",
+      "rationale": "The chat kept coming back to the long drive and the parking fee, and everyone wanted wildflowers and dark skies.",
+      "drive": "2h 10m from LA",
+      "when": "Late April, before the heat",
+      "reasons": [
+        {
+          "who": "Jules",
+          "quote": "next time can we not drive four hours each way"
+        },
+        {
+          "who": "Priya",
+          "quote": "the $30 parking pass hurt my soul"
+        },
+        {
+          "who": "Marcus",
+          "quote": "I want to see the wildflowers everyone keeps posting"
+        },
+        {
+          "who": "Jules",
+          "quote": "somewhere we can actually see stars"
+        }
+      ],
+      "alternatives": [
+        "Mojave Preserve",
+        "Big Sur (if we're feeling rich)"
+      ]
+    }
+  ]
+}

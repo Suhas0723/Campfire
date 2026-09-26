@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -30,3 +31,9 @@ class Config:
     EMBEDDING_DIM = int(os.environ.get("EMBEDDING_DIM", "1536"))
     DEFAULT_TRIP_TIMEZONE = os.environ.get("DEFAULT_TRIP_TIMEZONE", "America/Los_Angeles")
     RECAP_HOUR = int(os.environ.get("RECAP_HOUR", "21"))
+    DEMO_MODE = os.environ.get("DEMO_MODE", "false").strip().lower() in {"1", "true", "yes"}
+    SESSION_COOKIE_NAME = "campfire_session"
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").strip().lower() in {"1", "true", "yes"}
+    PERMANENT_SESSION_LIFETIME = timedelta(days=30)

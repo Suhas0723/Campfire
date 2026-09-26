@@ -58,6 +58,7 @@ class Trip(db.Model):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     anniversary_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
 
     group: Mapped[Group] = relationship(back_populates="trips")
     participants: Mapped[list[User]] = relationship(secondary=trip_participants)
@@ -66,7 +67,13 @@ class Trip(db.Model):
     stories: Mapped[list["Story"]] = relationship(back_populates="trip")
     suggestions: Mapped[list["Suggestion"]] = relationship(back_populates="trip")
 
+    def crew(self) -> list[str]:
+        order = (self.details or {}).get("crew_order") or []
+        names = [(user.display_name or "").split(" ")[0] for user in self.participants]
+        return sorted((n for n in names if n), key=lambda n: (order.index(n) if n in order else len(order), n))
+
     def to_dict(self) -> dict:
+        details = self.details or {}
         return {
             "id": str(self.id),
             "name": self.name,
@@ -74,6 +81,11 @@ class Trip(db.Model):
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "ended_at": self.ended_at.isoformat() if self.ended_at else None,
             "group_name": self.group.name if self.group else "",
+            "slug": self.slug,
+            "place": details.get("place"),
+            "location": details.get("location"),
+            "scene_key": details.get("scene_key"),
+            "crew": self.crew(),
         }
 
 

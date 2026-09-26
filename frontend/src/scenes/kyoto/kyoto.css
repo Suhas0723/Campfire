@@ -1,0 +1,29 @@
+/* Tints used only by the Kyoto scene. Everything else comes from the global palette. */
+.kyoto-map {
+  --kyoto-blossom: #f2d3c6;
+  --kyoto-blossom-shade: #dfaea0;
+  --kyoto-water: #9fb4ad;
+  --kyoto-stone: #b5a493;
+  --kyoto-stone-shade: #8e7d6d;
+}
+
+.kyoto-petal {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  animation: kyoto-petal-drift 14s linear infinite;
+}
+
+@keyframes kyoto-petal-drift {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  12% { opacity: 0.9; }
+  85% { opacity: 0.9; }
+  100% { transform: translate(260px, 190px) rotate(320deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kyoto-petal {
+    animation: none;
+    opacity: 0.75;
+  }
+}

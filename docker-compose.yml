@@ -35,6 +35,8 @@ services:
       MEDIA_DIR: /data/media
       PUBLIC_APP_URL: http://localhost:5173
       SECRET_KEY: ${SECRET_KEY:-dev-change-me}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
       DEFAULT_TRIP_TIMEZONE: ${DEFAULT_TRIP_TIMEZONE:-America/Los_Angeles}
       RECAP_HOUR: ${RECAP_HOUR:-21}

@@ -4,6 +4,23 @@ import { FlameLogo, PauseIcon, PlayIcon } from '../ui/icons.jsx';
 import { estimateMs, formatClock, stopIndexAt, storyStops } from '../data/trip.js';
 
 const BARS = [0.4, 0.8, 0.55, 1, 0.7, 0.35, 0.9, 0.6, 0.45, 0.85, 0.5, 0.75, 0.3, 0.65];
+const NARRATORS = [
+  { id: 'woman', label: 'Woman' },
+  { id: 'man', label: 'Man' },
+];
+
+function savedNarrator() {
+  try {
+    return localStorage.getItem('campfire-narrator') === 'man' ? 'man' : 'woman';
+  } catch {
+    return 'woman';
+  }
+}
+
+function narrationSrc(segment, narrator) {
+  if (segment.kind !== 'narration') return segment.audio_url;
+  return segment.voices?.[narrator] || segment.audio_url;
+}
 
 const ease = (u) => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
 
@@ -37,12 +54,16 @@ function StoryPlayer({ data, onExit }) {
   const [playing, setPlaying] = useState(true);
   const [durations, setDurations] = useState({});
   const [audioFailed, setAudioFailed] = useState({});
+  const [narrator, setNarrator] = useState(savedNarrator);
   const progressRef = useRef(0);
   const audioRef = useRef(null);
   const pendingSeek = useRef(null);
 
   const segment = segments[index];
-  const usesAudio = Boolean(segment.audio_url) && !audioFailed[index];
+  const src = narrationSrc(segment, narrator);
+  const failKey = `${index}:${narrator}`;
+  const usesAudio = Boolean(src) && !audioFailed[failKey];
+  const canChooseVoice = segments.some((item) => item.kind === 'narration' && item.voices?.woman && item.voices?.man);
   const lengths = segments.map((s, i) => durations[i] ?? estimateMs(s));
   const total = lengths.reduce((a, b) => a + b, 0);
   const elapsed = lengths.slice(0, index).reduce((a, b) => a + b, 0) + segProgress * lengths[index];
@@ -89,12 +110,23 @@ function StoryPlayer({ data, onExit }) {
     if (playing) {
       audio.play().catch((err) => {
         if (err.name === 'NotAllowedError') setPlaying(false);
-        else setAudioFailed((f) => ({ ...f, [index]: true }));
+        else setAudioFailed((f) => ({ ...f, [failKey]: true }));
       });
     } else {
       audio.pause();
     }
-  }, [playing, index, usesAudio]);
+  }, [playing, index, usesAudio, narrator, failKey]);
+
+  const chooseNarrator = (voice) => {
+    if (voice === narrator) return;
+    pendingSeek.current = progressRef.current;
+    setNarrator(voice);
+    try {
+      localStorage.setItem('campfire-narrator', voice);
+    } catch {
+      // Playback still switches for this session if storage is blocked.
+    }
+  };
 
   const togglePlay = () => {
     if (atEnd) {
@@ -184,8 +216,8 @@ function StoryPlayer({ data, onExit }) {
         {usesAudio && (
           <audio
             ref={audioRef}
-            key={`audio-${index}`}
-            src={segment.audio_url}
+            key={`audio-${index}-${narrator}`}
+            src={src}
             onLoadedMetadata={(e) => {
               const audio = e.currentTarget;
               setDurations((d) => ({ ...d, [index]: audio.duration * 1000 }));
@@ -199,7 +231,7 @@ function StoryPlayer({ data, onExit }) {
               if (audio.duration) setProgress(audio.currentTime / audio.duration);
             }}
             onEnded={advance}
-            onError={() => setAudioFailed((f) => ({ ...f, [index]: true }))}
+            onError={() => setAudioFailed((f) => ({ ...f, [failKey]: true }))}
           />
         )}
       </div>
@@ -218,6 +250,21 @@ function StoryPlayer({ data, onExit }) {
           })}
         </div>
         <span className="player-time">{formatClock(total)}</span>
+        {canChooseVoice && (
+          <div className="narrator-toggle" role="group" aria-label="Narrator voice">
+            {NARRATORS.map((voice) => (
+              <button
+                key={voice.id}
+                type="button"
+                className={narrator === voice.id ? 'is-on' : ''}
+                aria-pressed={narrator === voice.id}
+                onClick={() => chooseNarrator(voice.id)}
+              >
+                {voice.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

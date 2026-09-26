@@ -1,7 +1,7 @@
 import logging
 
-from anthropic import Anthropic
 from flask import current_app
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -11,18 +11,21 @@ class IntegrationNotConfigured(RuntimeError):
 
 
 def generate_text(*, system: str, user: str, max_tokens: int = 2000) -> str:
-    api_key = current_app.config["ANTHROPIC_API_KEY"]
+    api_key = current_app.config["OPENAI_API_KEY"]
     if not api_key:
-        raise IntegrationNotConfigured("ANTHROPIC_API_KEY is not set")
+        raise IntegrationNotConfigured("OPENAI_API_KEY is not set")
 
-    client = Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model=current_app.config["ANTHROPIC_MODEL"],
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
+    client = OpenAI(api_key=api_key, timeout=120)
+    message = client.chat.completions.create(
+        model=current_app.config["OPENAI_MODEL"],
+        max_completion_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
     )
-    parts = [block.text for block in message.content if getattr(block, "text", None)]
-    if not parts:
-        logger.warning("Claude returned no text")
-    return "".join(parts)
+    content = message.choices[0].message.content if message.choices else ""
+    text = content if isinstance(content, str) else ""
+    if not text:
+        logger.warning("ChatGPT returned no text")
+    return text

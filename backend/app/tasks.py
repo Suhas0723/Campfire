@@ -1,12 +1,13 @@
 import logging
+import uuid
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
-
-from flask import current_app
 
 from app.celery_app import celery
 from app.extensions import db
-from app.models import ACTIVE, ENDED, Story, Trip
+from app.models import ENDED, Message, Trip
+from app.services.llm import IntegrationNotConfigured
+from app.services.story import assemble_full, run_due_recaps
+from app.services.transcription import transcribe
 
 logger = logging.getLogger(__name__)
 
@@ -18,45 +19,47 @@ def _plus_one_year(value):
         return value.replace(month=2, day=28, year=value.year + 1)
 
 
+@celery.task(bind=True, max_retries=3, default_retry_delay=30, name="campfire.transcribe_message")
+def transcribe_message(self, message_id: str) -> None:
+    """Write an ElevenLabs transcript onto one captured voice note."""
+    try:
+        message_uuid = uuid.UUID(message_id)
+    except ValueError:
+        logger.info("Ignoring transcription for invalid id %s", message_id)
+        return
+
+    message = db.session.get(Message, message_uuid)
+    if (
+        message is None
+        or message.excluded
+        or message.type != "audio"
+        or not message.media_path
+        or message.transcript is not None
+    ):
+        return
+
+    try:
+        message.transcript = transcribe(message.media_path)
+        db.session.commit()
+    except IntegrationNotConfigured:
+        db.session.rollback()
+        logger.info("ElevenLabs is unset; left %s without a transcript", message_id)
+    except Exception as exc:
+        db.session.rollback()
+        logger.exception("Transcription failed for %s", message_id)
+        raise self.retry(exc=exc) from exc
+
+
 @celery.task(name="campfire.generate_due_recaps")
 def generate_due_recaps():
-    """Mark a pending nightly story once local time passes the recap hour.
+    """Assemble a nightly recap once local time passes the recap hour."""
+    return run_due_recaps()
 
-    The script, voice note, and group post are not assembled yet. Creating the
-    row keeps the hourly check from repeating itself all night.
-    """
-    zone = ZoneInfo(current_app.config["DEFAULT_TRIP_TIMEZONE"])
-    now = datetime.now(zone)
-    if now.hour < current_app.config["RECAP_HOUR"]:
-        return 0
 
-    created = 0
-    trips = db.session.query(Trip).filter_by(status=ACTIVE).all()
-    for trip in trips:
-        exists = (
-            db.session.query(Story)
-            .filter_by(trip_id=trip.id, kind="nightly", for_date=now.date())
-            .first()
-        )
-        if exists:
-            continue
-        db.session.add(
-            Story(
-                trip_id=trip.id,
-                kind="nightly",
-                for_date=now.date(),
-                title=now.date().isoformat(),
-                status="pending",
-            )
-        )
-        created += 1
-    db.session.commit()
-    if created:
-        logger.info(
-            "Marked %s nightly recap(s) pending. Script generation is not wired yet.",
-            created,
-        )
-    return created
+@celery.task(name="campfire.assemble_full_story")
+def assemble_full_story(trip_id: str) -> None:
+    """Write the end-of-trip story the playback page reads."""
+    assemble_full(trip_id)
 
 
 @celery.task(name="campfire.send_due_anniversaries")

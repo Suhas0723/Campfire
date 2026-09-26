@@ -2,7 +2,7 @@
 
 Campfire joins a friend group's existing WhatsApp trip chat and turns the texts, photos, and voice notes already in that thread into a narrated story: a short voice note each night, and a full **Around the Campfire** playback when the trip is over.
 
-This repository is the first runnable scaffold: WhatsApp capture, the trip privacy window, Postgres, and the playback shell. Story generation, side quests, and anniversary posts are stubbed behind the same boundaries the rest of the system will use. Product detail lives in [docs/PROJECT.md](docs/PROJECT.md).
+This repository captures a WhatsApp trip, writes the nightly recap and the full Around the Campfire story, and plays that story back. Side quests, next-trip suggestions, and anniversary posts are still stubs. Product detail lives in [docs/PROJECT.md](docs/PROJECT.md).
 
 ## Layout
 
@@ -35,7 +35,7 @@ Load a sample trip without WhatsApp:
 docker compose exec backend python -m app.seed
 ```
 
-Copy `.env.example` to `.env` when you add Claude, Whisper, ElevenLabs, Backboard, or Google Maps keys. Compose starts without those keys. The map on the playback page appears after `GOOGLE_MAPS_API_KEY` is set and the frontend container is restarted.
+Copy `.env.example` to `.env` when you add ChatGPT, ElevenLabs, or Backboard keys. Compose starts without those keys. Nightly recaps and the full story need an OpenAI key plus an ElevenLabs voice. Voice-note transcripts use that same ElevenLabs key. The playback map is illustrated from the trip's coordinates and does not use `GOOGLE_MAPS_API_KEY`.
 
 | Service | URL |
 | --- | --- |
@@ -56,4 +56,4 @@ The linked WhatsApp account is the bot. Use a spare number. Baileys is an unoffi
 
 ## Current limits
 
-Nightly scripts, full-story audio, side-quest detection, next-trip suggestions, and anniversary posts are not generated yet. Celery records that a nightly recap is due and logs anniversaries; it does not call the model providers. Playback links are the trip id, with no account login.
+Side-quest detection, next-trip suggestions, and anniversary posts are not generated yet. The anniversary job only logs trips that are due. Playback links are the trip id, with no account login. Place pins on a generated story use coordinates from the model.

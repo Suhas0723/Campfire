@@ -7,6 +7,7 @@
     "ended_at": "2026-03-16T20:00:00Z",
     "group_name": "Desert trip crew",
     "place": "Joshua Tree National Park",
+    "location": { "name": "Joshua Tree", "lat": 33.8734, "lng": -115.901 },
     "crew": ["Ana", "Priya", "Dev", "Marcus", "Jules"]
   },
   "stats": {

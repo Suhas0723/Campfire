@@ -1,29 +1,33 @@
 import { FlameLogo } from './icons.jsx';
+import UserMenu from '../auth/UserMenu.jsx';
 
 const NAV = [
-  { id: 'trip', label: 'Trips' },
+  { id: 'fires', label: 'Trips' },
   { id: 'nightly', label: 'Nightly' },
   { id: 'quests', label: 'Side quests' },
   { id: 'next', label: 'Next fire' },
 ];
 
-export default function TopBar({ onOpen }) {
+export default function TopBar({ onOpen, canOpen = () => true }) {
   return (
     <header className="topbar">
-      <button className="brand" onClick={() => onOpen('trip')}>
+      <button className="brand" onClick={() => onOpen('fires')}>
         <FlameLogo size={28} />
         <span>Campfire</span>
       </button>
       <nav className="topnav" aria-label="Main">
-        {NAV.map((n) => (
+        {NAV.filter((n) => canOpen(n.id)).map((n) => (
           <button key={n.id} className="topnav-link" onClick={() => onOpen(n.id)}>
             {n.label}
           </button>
         ))}
       </nav>
-      <button className="btn-primary" onClick={() => onOpen('start')}>
-        Start a trip
-      </button>
+      <div className="topbar-right">
+        <button className="btn-primary" onClick={() => onOpen('start')}>
+          Start a trip
+        </button>
+        <UserMenu />
+      </div>
     </header>
   );
 }

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TripMap from './TripMap.jsx';
+import StoryIntroGlobe from './StoryIntroGlobe.jsx';
 import { FlameLogo, PauseIcon, PlayIcon } from '../ui/icons.jsx';
 import { estimateMs, formatClock, stopIndexAt, storyStops } from '../data/trip.js';
 
@@ -37,27 +38,38 @@ function PlayerMessage({ title, children, onExit }) {
   );
 }
 
-export default function StoryPlayerWindow({ data, onExit }) {
+export default function StoryPlayerWindow({ data, onExit, MapView = TripMap }) {
   if (data.status === 'loading') return <PlayerMessage title="Gathering everyone around the fire…" onExit={onExit} />;
   if (data.status === 'missing') return <PlayerMessage title="We couldn't find that trip." onExit={onExit}>The link may be old, or the trip was removed.</PlayerMessage>;
   if (data.status === 'empty') return <PlayerMessage title="No trips yet." onExit={onExit}>Add Campfire to a WhatsApp group and send /campfire start.</PlayerMessage>;
   if (!data.segments?.length) return <PlayerMessage title="This story isn't ready yet." onExit={onExit}>Campfire tells it once the trip's recaps are written.</PlayerMessage>;
-  return <StoryPlayer key={data.trip.id} data={data} onExit={onExit} />;
+  return <StoryPlayer key={data.trip.id} data={data} onExit={onExit} MapView={MapView} />;
 }
 
-function StoryPlayer({ data, onExit }) {
+function StoryPlayer({ data, onExit, MapView }) {
   const { trip, segments, locations } = data;
   const stops = useMemo(() => storyStops(locations, segments), [locations, segments]);
+  const place = useMemo(() => {
+    if (trip.location) return trip.location;
+    return stops[0] ? { name: stops[0].name, lat: stops[0].latitude, lng: stops[0].longitude } : null;
+  }, [trip.location, stops]);
 
+  const [intro, setIntro] = useState(Boolean(place));
   const [index, setIndex] = useState(0);
   const [segProgress, setSegProgress] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(!place);
   const [durations, setDurations] = useState({});
   const [audioFailed, setAudioFailed] = useState({});
   const [narrator, setNarrator] = useState(savedNarrator);
   const progressRef = useRef(0);
   const audioRef = useRef(null);
   const pendingSeek = useRef(null);
+  const mapRef = useRef(null);
+
+  const endIntro = useCallback(() => {
+    setIntro(false);
+    setPlaying(true);
+  }, []);
 
   const segment = segments[index];
   const src = narrationSrc(segment, narrator);
@@ -166,12 +178,16 @@ function StoryPlayer({ data, onExit }) {
   return (
     <div className="player">
       <div className="player-stage">
-        <TripMap stops={stops} seedKey={trip.id} position={Math.max(0, position)} activeIndex={activeStop} />
+        {intro && <StoryIntroGlobe location={place} mapRef={mapRef} onComplete={endIntro} />}
+
+        <div className="map-layer" ref={mapRef}>
+          <MapView stops={stops} seedKey={trip.id} position={Math.max(0, position)} activeIndex={activeStop} />
+        </div>
 
         <div className="player-heading">
           <span className="eyebrow">Now telling</span>
           <strong>{trip.name}</strong>
-          {activeStop >= 0 && (
+          {!intro && activeStop >= 0 && (
             <span className="player-chapter">
               Stop {activeStop + 1} of {stops.length} · {stops[activeStop].name}
             </span>
@@ -182,7 +198,7 @@ function StoryPlayer({ data, onExit }) {
           Back to the journal
         </button>
 
-        {segment.kind === 'photo' && (
+        {!intro && segment.kind === 'photo' && (
           <figure className={`photo-pop${photoOnLeft ? ' on-left' : ''}`} key={`photo-${index}`}>
             {segment.photo_url ? (
               <img src={segment.photo_url} alt={segment.location?.name || 'Trip photo'} />
@@ -196,22 +212,26 @@ function StoryPlayer({ data, onExit }) {
           </figure>
         )}
 
-        <div className="voice-chip" key={`chip-${speaker}`}>
-          <span className={`voice-avatar${isVoice ? '' : ' is-narrator'}`}>{isVoice ? speaker[0] : <FlameLogo size={22} />}</span>
-          <span className="voice-meta">
-            <strong>{speaker}</strong>
-            <span>{isVoice ? 'voice note' : segment.kind === 'photo' ? 'photo' : 'narrator'}</span>
-          </span>
-          <span className={`waveform${playing ? ' is-playing' : ''}`} aria-hidden="true">
-            {BARS.map((h, i) => (
-              <span key={i} style={{ '--h': h, animationDelay: `${(i % 5) * -0.13}s` }} />
-            ))}
-          </span>
-        </div>
+        {!intro && (
+          <>
+            <div className="voice-chip" key={`chip-${speaker}`}>
+              <span className={`voice-avatar${isVoice ? '' : ' is-narrator'}`}>{isVoice ? speaker[0] : <FlameLogo size={22} />}</span>
+              <span className="voice-meta">
+                <strong>{speaker}</strong>
+                <span>{isVoice ? 'voice note' : segment.kind === 'photo' ? 'photo' : 'narrator'}</span>
+              </span>
+              <span className={`waveform${playing ? ' is-playing' : ''}`} aria-hidden="true">
+                {BARS.map((h, i) => (
+                  <span key={i} style={{ '--h': h, animationDelay: `${(i % 5) * -0.13}s` }} />
+                ))}
+              </span>
+            </div>
 
-        <p className="subtitle" key={index}>
-          {isVoice ? `“${segment.text}”` : segment.text}
-        </p>
+            <p className="subtitle" key={index}>
+              {isVoice ? `“${segment.text}”` : segment.text}
+            </p>
+          </>
+        )}
 
         {usesAudio && (
           <audio
@@ -236,7 +256,7 @@ function StoryPlayer({ data, onExit }) {
         )}
       </div>
 
-      <div className="player-controls">
+      <div className={`player-controls${intro ? ' is-waiting' : ''}`} inert={intro || undefined}>
         <button className="player-toggle" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
           {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} color="fire-yellow" />}
         </button>

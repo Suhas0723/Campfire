@@ -1,0 +1,157 @@
+{
+  "slug": "kyoto",
+  "name": "Kyoto spring break",
+  "status": "ended",
+  "started_at": "2026-03-28T09:00:00Z",
+  "ended_at": "2026-04-02T21:00:00Z",
+  "group_name": "Kyoto crew",
+  "details": {
+    "place": "Kyoto, Japan",
+    "location": {
+      "name": "Kyoto",
+      "lat": 35.0116,
+      "lng": 135.7681
+    },
+    "crew_order": [
+      "Priya",
+      "Dev",
+      "Marcus",
+      "Ana"
+    ],
+    "cover": {
+      "label": "Gate forty-something",
+      "by": "Ana",
+      "url": null
+    }
+  },
+  "locations": [
+    {
+      "id": "fushimi",
+      "name": "Fushimi Inari",
+      "latitude": 34.9671,
+      "longitude": 135.7727
+    },
+    {
+      "id": "arashiyama",
+      "name": "Arashiyama Bamboo Grove",
+      "latitude": 35.017,
+      "longitude": 135.6713
+    },
+    {
+      "id": "gion",
+      "name": "Gion at night",
+      "latitude": 35.0037,
+      "longitude": 135.7788
+    }
+  ],
+  "segments": [
+    {
+      "order": 0,
+      "kind": "narration",
+      "text": "We climbed Fushimi Inari before the crowds, and the red gates just kept going. Near the bottom, Dev found a vending machine.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Fushimi Inari",
+        "lat": 34.9671,
+        "lng": 135.7727
+      },
+      "speaker": null
+    },
+    {
+      "order": 1,
+      "kind": "voice_note",
+      "text": "Ten thousand gates, and he's reviewing the vending machine.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Fushimi Inari",
+        "lat": 34.9671,
+        "lng": 135.7727
+      },
+      "speaker": "Marcus"
+    },
+    {
+      "order": 2,
+      "kind": "narration",
+      "text": "In Arashiyama the bamboo creaked overhead, and Ana finally got her photo with nobody else in it.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Arashiyama Bamboo Grove",
+        "lat": 35.017,
+        "lng": 135.6713
+      },
+      "speaker": null
+    },
+    {
+      "order": 3,
+      "kind": "voice_note",
+      "text": "Where's Dev? Oh. He found another vending machine.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Arashiyama Bamboo Grove",
+        "lat": 35.017,
+        "lng": 135.6713
+      },
+      "speaker": "Priya"
+    },
+    {
+      "order": 4,
+      "kind": "narration",
+      "text": "Gion at night was paper lanterns and wooden doors. We lost Dev for ten minutes and found him exactly where you'd guess.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Gion at night",
+        "lat": 35.0037,
+        "lng": 135.7788
+      },
+      "speaker": null
+    },
+    {
+      "order": 5,
+      "kind": "voice_note",
+      "text": "Okay, but this one has the peach soda. This is the good one.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": {
+        "name": "Gion at night",
+        "lat": 35.0037,
+        "lng": 135.7788
+      },
+      "speaker": "Dev"
+    }
+  ],
+  "suggestions": [
+    {
+      "body": "Nara for a day, an hour away by train",
+      "rationale": "The chat wanted more temples and fewer crowds, and Marcus hasn't stopped talking about the deer.",
+      "drive": "45 min by train",
+      "when": "Early May, after Golden Week",
+      "reasons": [
+        {
+          "who": "Marcus",
+          "quote": "the deer bow at you. they BOW"
+        },
+        {
+          "who": "Priya",
+          "quote": "somewhere quieter than Gion on a Saturday"
+        },
+        {
+          "who": "Ana",
+          "quote": "I still have 40 photos left on my card"
+        },
+        {
+          "who": "Dev",
+          "quote": "I heard the vending machines there are elite"
+        }
+      ],
+      "alternatives": [
+        "Osaka food crawl",
+        "Lake Biwa by bike"
+      ]
+    }
+  ]
+}

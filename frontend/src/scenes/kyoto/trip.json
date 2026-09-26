@@ -1,0 +1,144 @@
+{
+  "trip": {
+    "id": "kyoto",
+    "name": "Kyoto spring break",
+    "status": "ended",
+    "started_at": "2026-03-28T09:00:00Z",
+    "ended_at": "2026-04-02T21:00:00Z",
+    "group_name": "Kyoto crew",
+    "place": "Kyoto, Japan",
+    "location": { "name": "Kyoto", "lat": 35.0116, "lng": 135.7681 },
+    "crew": ["Priya", "Dev", "Marcus", "Ana"]
+  },
+  "stats": {
+    "messages": 2140,
+    "voiceNotes": 29,
+    "photoCount": 212
+  },
+  "locations": [
+    { "id": "fushimi", "name": "Fushimi Inari", "latitude": 34.9671, "longitude": 135.7727 },
+    { "id": "arashiyama", "name": "Arashiyama Bamboo Grove", "latitude": 35.017, "longitude": 135.6713 },
+    { "id": "gion", "name": "Gion at night", "latitude": 35.0037, "longitude": 135.7788 }
+  ],
+  "segments": [
+    {
+      "order": 0,
+      "kind": "narration",
+      "text": "We climbed Fushimi Inari before the crowds, and the red gates just kept going. Near the bottom, Dev found a vending machine.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Fushimi Inari", "lat": 34.9671, "lng": 135.7727 },
+      "speaker": null
+    },
+    {
+      "order": 1,
+      "kind": "voice_note",
+      "text": "Ten thousand gates, and he's reviewing the vending machine.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Fushimi Inari", "lat": 34.9671, "lng": 135.7727 },
+      "speaker": "Marcus"
+    },
+    {
+      "order": 2,
+      "kind": "narration",
+      "text": "In Arashiyama the bamboo creaked overhead, and Ana finally got her photo with nobody else in it.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Arashiyama Bamboo Grove", "lat": 35.017, "lng": 135.6713 },
+      "speaker": null
+    },
+    {
+      "order": 3,
+      "kind": "voice_note",
+      "text": "Where's Dev? Oh. He found another vending machine.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Arashiyama Bamboo Grove", "lat": 35.017, "lng": 135.6713 },
+      "speaker": "Priya"
+    },
+    {
+      "order": 4,
+      "kind": "narration",
+      "text": "Gion at night was paper lanterns and wooden doors. We lost Dev for ten minutes and found him exactly where you'd guess.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Gion at night", "lat": 35.0037, "lng": 135.7788 },
+      "speaker": null
+    },
+    {
+      "order": 5,
+      "kind": "voice_note",
+      "text": "Okay, but this one has the peach soda. This is the good one.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Gion at night", "lat": 35.0037, "lng": 135.7788 },
+      "speaker": "Dev"
+    }
+  ],
+  "suggestions": [
+    {
+      "body": "Nara for a day, an hour away by train",
+      "rationale": "The chat wanted more temples and fewer crowds, and Marcus hasn't stopped talking about the deer.",
+      "drive": "45 min by train",
+      "when": "Early May, after Golden Week",
+      "reasons": [
+        { "who": "Marcus", "quote": "the deer bow at you. they BOW" },
+        { "who": "Priya", "quote": "somewhere quieter than Gion on a Saturday" },
+        { "who": "Ana", "quote": "I still have 40 photos left on my card" },
+        { "who": "Dev", "quote": "I heard the vending machines there are elite" }
+      ],
+      "alternatives": ["Osaka food crawl", "Lake Biwa by bike"]
+    }
+  ],
+  "nightly": [
+    {
+      "id": "k1",
+      "night": "Night one",
+      "date": "Sat, Mar 28",
+      "title": "Fushimi Inari and the first vending machine",
+      "duration": "3:42"
+    },
+    {
+      "id": "k2",
+      "night": "Night two",
+      "date": "Mon, Mar 30",
+      "title": "Arashiyama, bamboo, and Ana's empty-path photo",
+      "duration": "4:18"
+    },
+    {
+      "id": "k3",
+      "night": "Night three",
+      "date": "Wed, Apr 1",
+      "title": "Lanterns in Gion, and the peach soda verdict",
+      "duration": "5:05"
+    }
+  ],
+  "sideQuests": [
+    {
+      "id": "kq1",
+      "who": "Dev",
+      "title": "The vending machine tour",
+      "duration": "1:52",
+      "blurb": "Eleven machines in five days, one spreadsheet, and a firm ranking nobody asked for."
+    }
+  ],
+  "behindTheCamera": {
+    "photographer": "Ana",
+    "taken": 148,
+    "total": 212,
+    "appearances": 3,
+    "line": "Ana took 148 of your 212 photos. She's in three."
+  },
+  "photos": [
+    { "id": "kp1", "label": "Gate forty-something", "by": "Ana", "tilt": -3 },
+    { "id": "kp2", "label": "The empty bamboo path", "by": "Ana", "tilt": 4 },
+    { "id": "kp3", "label": "Dev and machine number six", "by": "Priya", "tilt": -5 },
+    { "id": "kp4", "label": "Gion after dark", "by": "Marcus", "tilt": 2 }
+  ],
+  "offTheRecord": [
+    "Dev's vending machine spreadsheet",
+    "Marcus trying to bow back at a deer poster",
+    "The karaoke room recording"
+  ]
+}

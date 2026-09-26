@@ -3,10 +3,13 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify
 from sqlalchemy import nulls_last
 
+from app.auth import current_user, login_required, trip_for_current_user, trips_for
 from app.extensions import db
 from app.models import Story, Suggestion, Trip
 
 bp = Blueprint("trips", __name__)
+
+NOT_FOUND = {"error": "Trip not found"}
 
 
 def _ordered_locations(trip: Trip) -> list:
@@ -43,25 +46,45 @@ def _segments_for(trip: Trip) -> list:
     return segments
 
 
+def _summary(trip: Trip) -> dict:
+    details = trip.details or {}
+    location = details.get("location")
+    return {
+        "id": str(trip.id),
+        "slug": trip.slug,
+        "title": trip.name,
+        "status": trip.status,
+        "location_name": details.get("place") or (location or {}).get("name") or "",
+        "started_at": trip.started_at.isoformat() if trip.started_at else None,
+        "ended_at": trip.ended_at.isoformat() if trip.ended_at else None,
+        "participants": trip.crew(),
+        "cover": details.get("cover"),
+        "story_ready": bool(_segments_for(trip)),
+    }
+
+
 @bp.get("/trips")
+@login_required
 def list_trips():
-    trips = db.session.query(Trip).order_by(Trip.started_at.desc()).all()
-    return jsonify([trip.to_dict() for trip in trips])
+    trips = trips_for(current_user()).order_by(Trip.started_at.desc()).all()
+    return jsonify([_summary(trip) for trip in trips])
 
 
 @bp.get("/trips/<uuid:trip_id>")
+@login_required
 def get_trip(trip_id):
-    trip = db.session.get(Trip, trip_id)
+    trip = trip_for_current_user(trip_id)
     if trip is None:
-        return jsonify({"error": "Trip not found"}), 404
+        return jsonify(NOT_FOUND), 404
     return jsonify(trip.to_dict())
 
 
 @bp.get("/trips/<uuid:trip_id>/playback")
+@login_required
 def playback(trip_id):
-    trip = db.session.get(Trip, trip_id)
+    trip = trip_for_current_user(trip_id)
     if trip is None:
-        return jsonify({"error": "Trip not found"}), 404
+        return jsonify(NOT_FOUND), 404
     suggestions = (
         db.session.query(Suggestion)
         .filter_by(trip_id=trip.id)

@@ -10,3 +10,5 @@ export const inboundStream = "campfire:inbound";
 export const outboundStream = "campfire:outbound";
 export const outboundGroup = "whatsapp";
 export const awaitingDmKey = "campfire:awaiting_dm";
+export const loginCodeStream = "campfire:login_codes";
+export const loginCodeGroup = "whatsapp-login";

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from flask import Blueprint, jsonify
 from sqlalchemy import nulls_last
 
@@ -5,6 +7,18 @@ from app.extensions import db
 from app.models import Story, Suggestion, Trip
 
 bp = Blueprint("trips", __name__)
+
+
+def _ordered_locations(trip: Trip) -> list:
+    def key(location):
+        arrived = location.arrived_at
+        if arrived is None:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        if arrived.tzinfo is None:
+            return arrived.replace(tzinfo=timezone.utc)
+        return arrived
+
+    return sorted(trip.locations, key=key)
 
 
 def _segments_for(trip: Trip) -> list:
@@ -57,7 +71,7 @@ def playback(trip_id):
     return jsonify(
         {
             "trip": trip.to_dict(),
-            "locations": [location.to_dict() for location in trip.locations],
+            "locations": [location.to_dict() for location in _ordered_locations(trip)],
             "segments": _segments_for(trip),
             "suggestions": [{"body": item.body, "rationale": item.rationale} for item in suggestions],
         }

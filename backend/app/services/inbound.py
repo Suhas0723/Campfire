@@ -145,7 +145,10 @@ def _handle_command(payload: dict, command: str) -> None:
     elif command != "help":
         reply = "I don't know that one. /campfire help lists what I understand."
 
+    ended_trip_id = trip.id if command == "end" and trip is not None and trip.status == ENDED else None
     db.session.commit()
+    if ended_trip_id is not None:
+        _enqueue_full_story(ended_trip_id)
     try:
         publish_outbound(group_jid, message_type="text", text=reply)
     except Exception:
@@ -198,20 +201,41 @@ def _capture(payload: dict) -> None:
     if sent_at.year < 2000:
         sent_at = datetime.now(timezone.utc)
 
-    db.session.add(
-        Message(
-            trip_id=trip.id,
-            sender_id=user.id,
-            whatsapp_message_id=message_id,
-            type=payload.get("type") or "text",
-            body=body,
-            media_path=media_path,
-            quoted_message_id=payload.get("quoted_message_id"),
-            sent_at=sent_at,
-        )
+    message = Message(
+        trip_id=trip.id,
+        sender_id=user.id,
+        whatsapp_message_id=message_id,
+        type=payload.get("type") or "text",
+        body=body,
+        media_path=media_path,
+        quoted_message_id=payload.get("quoted_message_id"),
+        sent_at=sent_at,
     )
+    db.session.add(message)
     try:
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
         logger.info("Duplicate WhatsApp message %s", message_id)
+        return
+
+    if message.type == "audio" and message.media_path:
+        _enqueue_transcription(message.id)
+
+
+def _enqueue_transcription(message_id) -> None:
+    try:
+        from app.tasks import transcribe_message
+
+        transcribe_message.delay(str(message_id))
+    except Exception:
+        logger.exception("Could not enqueue transcription for %s", message_id)
+
+
+def _enqueue_full_story(trip_id) -> None:
+    try:
+        from app.tasks import assemble_full_story
+
+        assemble_full_story.delay(str(trip_id))
+    except Exception:
+        logger.exception("Could not enqueue the full story for %s", trip_id)

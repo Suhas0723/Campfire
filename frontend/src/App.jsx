@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Route, Routes, useMatch, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthProvider.jsx';
 import RequireAuth from './auth/RequireAuth.jsx';
@@ -16,12 +16,26 @@ import { KYOTO_TRIP } from './scenes/kyoto/index.js';
 import { useMyTrips, usePlayback } from './auth/useMyTrips.js';
 import { endNight } from './auth/authApi.js';
 import YourFires from './auth/YourFires.jsx';
+import useIsMobile from './ui/useIsMobile.js';
 
 const fromRight = (w, y) => () => ({ x: Math.max(130, window.innerWidth - w - 130), y });
 const centered = (w, y) => () => ({ x: Math.max(120, Math.round((window.innerWidth - w) / 2)), y });
 
 // Extras built on the Desert trip's sample content; only its crew sees them.
 const DESERT_ONLY = new Set(['nightly', 'quests', 'offrecord']);
+
+const JAPAN_PLACE = /\b(japan|tokyo|kyoto|hiroshima|osaka|nara|fuji|hakone|kobe)\b/i;
+
+function usesJapanScene(trip, playback) {
+  if (!trip && !playback) return false;
+  if (trip?.slug === KYOTO_TRIP.id || trip?.scene_key === 'kyoto' || playback?.trip?.id === 'kyoto' || playback?.trip?.scene_key === 'kyoto') {
+    return true;
+  }
+  const place = playback?.trip?.location?.name || playback?.trip?.place || '';
+  const stops = (playback?.locations || []).map((stop) => stop.name).join(' ');
+  const text = [trip?.title, trip?.name, trip?.location_name, playback?.trip?.name, place, stops].filter(Boolean).join(' ');
+  return JAPAN_PLACE.test(text);
+}
 
 const WINDOWS = {
   fires: { title: 'Your fires', width: 640, pos: centered(640, 84), Body: YourFires },
@@ -97,6 +111,8 @@ function Workspace() {
   );
 
   const [open, setOpen] = useState([{ id: 'fires', pos: initialPos('fires') }]);
+  const { mobile } = useIsMobile();
+  const japanScene = usesJapanScene(playing, playData.status === 'ready' ? playData : null);
 
   const focus = useCallback(
     (id) => setOpen((ws) => (ws[ws.length - 1]?.id === id ? ws : [...ws.filter((w) => w.id !== id), ws.find((w) => w.id === id)])),
@@ -114,14 +130,26 @@ function Workspace() {
 
   const openFromUi = useCallback((id) => canOpen(id) && openWindow(id), [canOpen, openWindow]);
 
+  const leftPlayer = useRef(false);
+
   useEffect(() => {
-    if (playingId && !resolving) openWindow(playerWindow);
+    if (!playingId) leftPlayer.current = false;
+    else if (!resolving && !leftPlayer.current) openWindow(playerWindow);
   }, [playingId, resolving, playerWindow, openWindow]);
 
   const exitPlayer = useCallback(() => {
-    if (playerWindow === 'trip' && playing !== desert) setOpen((ws) => ws.filter((w) => w.id !== 'trip'));
+    leftPlayer.current = true;
+    if (mobile) {
+      setOpen((ws) => {
+        const rest = ws.filter((w) => w.id !== playerWindow && w.id !== 'fires');
+        const fires = ws.find((w) => w.id === 'fires') || { id: 'fires', pos: initialPos('fires') };
+        return [...rest, fires];
+      });
+    } else if (playerWindow === 'trip' && playing !== desert) {
+      setOpen((ws) => ws.filter((w) => w.id !== 'trip'));
+    }
     navigate('/');
-  }, [navigate, playerWindow, playing, desert]);
+  }, [navigate, playerWindow, playing, desert, mobile]);
 
   const close = useCallback(
     (id) => {
@@ -160,6 +188,14 @@ function Workspace() {
     }
   }, [activeTrip, endingNight]);
 
+  if (mobile && playingId) {
+    return (
+      <div className="m-play-root">
+        <StoryPlayer data={playData} onExit={exitPlayer} {...(japanScene ? { MapView: KYOTO_TRIP.MapView } : {})} />
+      </div>
+    );
+  }
+
   return (
     <>
       <TopBar
@@ -189,10 +225,8 @@ function Workspace() {
             onFocus={focus}
             onClose={close}
           >
-            {full && w.id === 'kyoto' ? (
-              <StoryPlayer data={playData} onExit={exitPlayer} MapView={KYOTO_TRIP.MapView} />
-            ) : full ? (
-              <StoryPlayer data={playData} onExit={exitPlayer} />
+            {full ? (
+              <StoryPlayer data={playData} onExit={exitPlayer} {...(japanScene ? { MapView: KYOTO_TRIP.MapView } : {})} />
             ) : (
               <Body data={tripData} onOpen={openFromUi} onPlay={play} trips={trips} tripsStatus={tripsStatus} onPlayTrip={playTrip} />
             )}

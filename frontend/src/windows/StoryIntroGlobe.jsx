@@ -85,7 +85,8 @@ export default function StoryIntroGlobe({ location, onComplete, mapRef }) {
       if (!svg) return;
       const w = svg.clientWidth;
       const h = svg.clientHeight;
-      const base = Math.min(w, h) * 0.35;
+      const phone = window.matchMedia('(max-width: 767px), (max-width: 932px) and (max-height: 499px)').matches;
+      const base = phone ? Math.min(window.innerWidth * 0.4, h * 0.46) : Math.min(w, h) * 0.35;
       const stop = measureStop(svg.parentElement, mapRef.current);
       const k = stop?.k ?? 1;
       const target = stop ?? { x: w / 2, y: h / 2 };

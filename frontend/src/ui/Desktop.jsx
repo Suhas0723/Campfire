@@ -1,4 +1,4 @@
-import { BookIcon, BubbleIcon, CompassIcon, FlameLogo, FootprintsIcon, LanternIcon, MapIcon, MoonIcon } from './icons.jsx';
+import { BookIcon, CompassIcon, FlameLogo, FootprintsIcon, LanternIcon, MapIcon, MoonIcon } from './icons.jsx';
 
 function FiresIcon({ size, className }) {
   return (
@@ -15,7 +15,6 @@ const LEFT_ICONS = [
   { id: 'nightly', label: 'Nightly recaps', Icon: MoonIcon },
   { id: 'quests', label: 'Side quests', Icon: FootprintsIcon },
   { id: 'next', label: 'Next fire', Icon: CompassIcon },
-  { id: 'talk', label: 'Talk to Campfire', Icon: BubbleIcon },
 ];
 
 const RIGHT_ICONS = [

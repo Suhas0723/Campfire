@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import data from '../mock/trip.json';
-import { BookIcon, FlameLogo, FootprintsIcon, MapIcon, MoonIcon, PlayIcon } from '../ui/icons.jsx';
+import { BookIcon, FootprintsIcon, MapIcon, MoonIcon, PlayIcon } from '../ui/icons.jsx';
 
-const { nightly, sideQuests, trip, stats, offTheRecord } = data;
+const { nightly, sideQuests, offTheRecord } = data;
 
 export function NightlyRecaps({ onPlay }) {
   return (
@@ -47,44 +47,6 @@ export function SideQuests({ onPlay }) {
           </button>
         </article>
       ))}
-    </div>
-  );
-}
-
-const SEED_CHAT = [
-  { from: 'campfire', text: `I've read all ${stats.messages.toLocaleString()} messages from the ${trip.name.toLowerCase()}. Ask me anything about it.` },
-  { from: 'me', text: 'Who got lost the most?' },
-  { from: 'campfire', text: 'Priya and Dev, by a mile. They took the long way back from Hidden Valley and turned it into a side quest.' },
-];
-
-export function TalkToCampfire() {
-  const [chat, setChat] = useState(SEED_CHAT);
-  const [draft, setDraft] = useState('');
-
-  const send = (e) => {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text) return;
-    setChat((c) => [...c, { from: 'me', text }, { from: 'campfire', text: "Good question. I'll have an answer once I'm hooked up to the real chat." }]);
-    setDraft('');
-  };
-
-  return (
-    <div className="talk">
-      <ul className="talk-log">
-        {chat.map((m, i) => (
-          <li key={i} className={`bubble bubble-${m.from}`}>
-            {m.from === 'campfire' && <FlameLogo size={22} />}
-            <span>{m.text}</span>
-          </li>
-        ))}
-      </ul>
-      <form className="talk-input" onSubmit={send}>
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about the trip…" aria-label="Message Campfire" />
-        <button className="btn-primary" type="submit">
-          Send
-        </button>
-      </form>
     </div>
   );
 }

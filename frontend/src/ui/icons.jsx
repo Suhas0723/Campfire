@@ -92,19 +92,6 @@ export function CompassIcon(p) {
   );
 }
 
-export function BubbleIcon(p) {
-  return (
-    <Icon {...p}>
-      <Shadow />
-      <path d="M10,14 C10,10 13,8 17,8 L47,8 C51,8 54,10 54,14 L54,36 C54,40 51,42 47,42 L28,42 L16,52 L18,42 L17,42 C13,42 10,40 10,36Z" style={{ ...OUT, fill: c('cream') }} {...sw()} />
-      <path d="M12,34 C12,38 14,40 18,40 L46,40 C50,40 52,38 52,34 L52,36 C52,40 50,42 46,42 L18,42 C14,42 12,40 12,36Z" style={{ fill: c('wood-light') }} />
-      <circle cx="22" cy="25" r="3.5" style={{ ...OUT, fill: c('fire-orange') }} {...sw(1.8)} />
-      <circle cx="32" cy="25" r="3.5" style={{ ...OUT, fill: c('fire-orange') }} {...sw(1.8)} />
-      <circle cx="42" cy="25" r="3.5" style={{ ...OUT, fill: c('fire-orange') }} {...sw(1.8)} />
-    </Icon>
-  );
-}
-
 export function LanternIcon(p) {
   return (
     <Icon {...p}>

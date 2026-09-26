@@ -1050,6 +1050,29 @@ button {
   color: var(--bark);
 }
 
+.narrator-toggle {
+  display: flex;
+  border: 2px solid var(--bark-dark);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.narrator-toggle button {
+  border: 0;
+  background: transparent;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--bark);
+  cursor: pointer;
+}
+
+.narrator-toggle button.is-on {
+  background: var(--fire-orange);
+  color: var(--bark-dark);
+}
+
 .progress {
   position: relative;
   flex: 1;

@@ -161,6 +161,7 @@ Streams are Redis streams of one field, `data`, whose value is a JSON object.
 - Nightly local tips. After the day recap, Campfire reads that day's chat vibe (mood, energy, `suggest_mode`) and dietary notes, then asks **Muse Spark** (Meta Model API) for tomorrow's restaurants, activities, and fun near the trip location. The voice note includes a short vibe-matched "for tomorrow" line, and WhatsApp gets a text list. Without `MUSE_API_KEY`, or when Muse fails, the night still posts the day recap alone.
 - Clients for ChatGPT and ElevenLabs are used by that loop.
 - Cross-trip memory. Each WhatsApp group gets one Backboard assistant, named `campfire:<group jid>`. Before a nightly or full story, the prompt gets that group's closest memories under "Known about this group". The model returns new nicknames, jokes, and sentiment in `memories`, and each one is saved after the story is. Without `BACKBOARD_API_KEY`, or when Backboard fails, stories are written from the chat alone.
+- Next-trip suggestions. After the full story is saved, ChatGPT writes one `Suggestion` (`body` + `rationale`) from the trip chat and known group memories. The Next fire window already reads those rows from playback. A failed suggestion is logged and does not fail the story. The rationale is also stored in Backboard as sentiment when remember succeeds.
 - Playback walks story segments over an illustrated map in `frontend/src/windows/TripMap.jsx`. `GOOGLE_MAPS_API_KEY` does not change that page.
 
 Same-day reactions are part of the recap prompt. Reactions on the recap voice note itself are not tied back yet, because the outbound bridge does not return the sent message id. Messages sent after that night's recap run are kept for the full story.
@@ -168,7 +169,5 @@ Same-day reactions are part of the recap prompt. Reactions on the recap voice no
 ## What is still ahead
 
 1. **Photos and places** — photo segments already use an image when the model cites one. Still ahead: embeddings for photo and message correlation, and a geocoder in place of model coordinates. The `messages.embedding` column is unused.
-2. **Next-trip suggestions** — on end, write `Suggestion` rows from chat sentiment. The playback page already renders `body`.
-3. **Side quests** — the `SideQuest` model and `campfire:awaiting_dm` helpers exist. A direct message is still logged and ignored. Detection, the private question, and keep-private or share come after stories exist.
-4. **Anniversaries** — the daily job can see which trips are due. It does not post the callback or set `anniversary_sent_at`.
-5. **Playback auth** — the link stays the unguessed trip id until it is shared outside the group.
+2. **Anniversaries** — the daily job can see which trips are due. It does not post the callback or set `anniversary_sent_at`.
+3. **Side quests** — unused. The model and window stay; nothing detects split-offs or accepts DMs.

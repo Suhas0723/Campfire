@@ -1,0 +1,61 @@
+# Production overlay. Postgres, Redis, and the API stay on the Docker network.
+# From the repo root, after DNS points at this host:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    ports: !reset []
+    restart: unless-stopped
+
+  redis:
+    ports: !reset []
+    restart: unless-stopped
+
+  backend:
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Set PUBLIC_APP_URL to https://your-domain}
+      SESSION_COOKIE_SECURE: "true"
+      BEHIND_PROXY: "true"
+
+  celery:
+    restart: unless-stopped
+    environment:
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Set PUBLIC_APP_URL to https://your-domain}
+      SESSION_COOKIE_SECURE: "true"
+      BEHIND_PROXY: "true"
+
+  ingest:
+    restart: unless-stopped
+    environment:
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Set PUBLIC_APP_URL to https://your-domain}
+      SESSION_COOKIE_SECURE: "true"
+      BEHIND_PROXY: "true"
+
+  whatsapp:
+    restart: unless-stopped
+
+  frontend:
+    profiles: ["dev"]
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN to your hostname}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

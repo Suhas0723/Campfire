@@ -6,6 +6,7 @@ from flask import Flask
 from flask_cors import CORS
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import Config
 from app.extensions import db
@@ -24,6 +25,9 @@ def create_app():
     db.init_app(app)
     Path(app.config["MEDIA_DIR"]).mkdir(parents=True, exist_ok=True)
     CORS(app, resources={r"/api/*": {"origins": [app.config["PUBLIC_APP_URL"]]}}, supports_credentials=True)
+    if app.config["BEHIND_PROXY"]:
+        # One trusted hop. Caddy sets X-Forwarded-Proto.
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     if app.config["SECRET_KEY"] in {"dev-change-me", "change-me"} and not app.config["DEMO_MODE"]:
         logger.warning("SECRET_KEY is the default; set a real one so session cookies can't be forged")
 

@@ -56,4 +56,4 @@ The linked WhatsApp account is the bot. Use a spare number. Baileys is an unoffi
 
 ## Current limits
 
-Side-quest detection, next-trip suggestions, and anniversary posts are not generated yet. The anniversary job only logs trips that are due. Playback links are the trip id, with no account login. Place pins on a generated story use coordinates from the model.
+Side-quest detection, end-of-trip next-trip suggestions, and anniversary posts are not generated yet. The anniversary job only logs trips that are due. Place pins on a generated story use coordinates from the model. Nightly Muse tips need `MUSE_API_KEY` (Meta Model API); without it the day recap still posts.

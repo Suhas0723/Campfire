@@ -3,7 +3,7 @@
 import json
 import logging
 import uuid
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from flask import current_app
@@ -13,6 +13,13 @@ from app.models import ACTIVE, Location, Message, Story, Trip, utcnow
 from app.redis_streams import publish_outbound
 from app.services.llm import IntegrationNotConfigured, generate_text
 from app.services.memory import recall, remember
+from app.services.muse import (
+    analyze_day_vibe,
+    format_spoken_tomorrow,
+    format_whatsapp_text,
+    merge_dietary,
+    suggest_tonight,
+)
 from app.services.speech import synthesize, synthesize_voices
 from app.services.transcription import transcribe
 
@@ -290,6 +297,7 @@ def _fill_nightly(story_id: str) -> None:
 
     zone = _zone()
     group_jid = trip.group.whatsapp_jid
+    chat_text = format_messages(messages, zone)
     prior = _nightly_scripts(trip.id, before=story.for_date)
     user = "\n\n".join(
         [
@@ -297,7 +305,7 @@ def _fill_nightly(story_id: str) -> None:
             f"Date: {story.for_date.isoformat()}",
             f"Known about this group:\n{_known_about(group_jid)}",
             f"Earlier nightly recaps:\n{prior or 'None yet.'}",
-            f"Chat:\n{format_messages(messages, zone)}",
+            f"Chat:\n{chat_text}",
         ]
     )
     payload = parse_model_json(generate_text(system=NIGHTLY_SYSTEM, user=user, max_tokens=3000))
@@ -307,6 +315,53 @@ def _fill_nightly(story_id: str) -> None:
         story_id=str(story.id),
         speak=_speak,
     )
+
+    vibe = analyze_day_vibe(chat_text=chat_text, group_jid=group_jid)
+    dietary = _resolve_dietary(trip, vibe)
+    location = _resolve_location(trip, segments)
+    muse_result = None
+    if location:
+        muse_result = suggest_tonight(
+            location=location,
+            dietary=dietary,
+            vibe=vibe,
+            day_summary=vibe.get("summary") or "",
+        )
+    if muse_result:
+        tomorrow_text = format_spoken_tomorrow(muse_result)
+        spoken_path, voice_map = _spoken_audio(_speak(tomorrow_text, f"{story.id}-tomorrow"))
+        voice_urls = {key: _media_url(path) for key, path in voice_map.items()} if voice_map else None
+        segments.append(
+            _segment(
+                "narration",
+                tomorrow_text,
+                _media_url(spoken_path),
+                None,
+                location,
+                None,
+                order=len(segments),
+                voices=voice_urls,
+            )
+        )
+        narration = [segment["text"] for segment in segments if segment["kind"] == "narration"]
+        try:
+            recap_path, _ = _spoken_audio(_speak("\n\n".join(narration), f"{story.id}-recap"))
+        except Exception:
+            logger.exception("Could not re-speak recap with tomorrow tips; keeping day-only audio")
+
+    day_key = story.for_date.isoformat() if story.for_date else "unknown"
+    details = dict(trip.details or {})
+    if dietary:
+        details["dietary"] = dietary
+    vibes = dict(details.get("nightly_vibe") or {})
+    vibes[day_key] = vibe
+    details["nightly_vibe"] = vibes
+    if muse_result:
+        tips = dict(details.get("nightly_suggestions") or {})
+        tips[day_key] = muse_result
+        details["nightly_suggestions"] = tips
+    trip.details = details
+
     story.title = title or story.for_date.isoformat()
     story.script = _narration_script(segments)
     story.segments = segments
@@ -316,7 +371,58 @@ def _fill_nightly(story_id: str) -> None:
     db.session.commit()
     if recap_path:
         _post_audio(group_jid, "Here's tonight's campfire.", recap_path)
+    if muse_result:
+        try:
+            publish_outbound(group_jid, message_type="text", text=format_whatsapp_text(muse_result))
+        except Exception:
+            logger.exception("Tomorrow tips text did not send")
     _remember_all(group_jid, payload, trip)
+    if vibe.get("summary"):
+        remember(
+            group_jid=group_jid,
+            kind="sentiment",
+            content=f"{day_key}: {vibe['summary']} (mode={vibe.get('suggest_mode')})",
+            metadata={"trip_id": str(trip.id), "trip_name": trip.name, "date": day_key},
+        )
+
+
+def _resolve_dietary(trip: Trip, vibe: dict) -> list[str]:
+    stored = (trip.details or {}).get("dietary") if isinstance(trip.details, dict) else None
+    stored_list = [str(x) for x in stored] if isinstance(stored, list) else []
+    return merge_dietary(stored_list, vibe.get("dietary") or [])
+
+
+def _resolve_location(trip: Trip, segments: list[dict]) -> dict | None:
+    for segment in reversed(segments or []):
+        place = segment.get("location") if isinstance(segment, dict) else None
+        if not isinstance(place, dict):
+            continue
+        lat = _float(place.get("lat", place.get("latitude")))
+        lng = _float(place.get("lng", place.get("longitude")))
+        name = str(place.get("name") or "").strip()
+        if name and lat is not None and lng is not None:
+            return {"name": name, "lat": lat, "lng": lng}
+
+    if trip.locations:
+        def arrived_key(loc):
+            arrived = loc.arrived_at
+            if arrived is None:
+                return datetime.min.replace(tzinfo=timezone.utc)
+            if arrived.tzinfo is None:
+                return arrived.replace(tzinfo=timezone.utc)
+            return arrived
+
+        pin = max(trip.locations, key=arrived_key)
+        return {"name": pin.name, "lat": pin.latitude, "lng": pin.longitude}
+
+    details = trip.details or {}
+    place_name = str(details.get("place") or "").strip()
+    loc = details.get("location") if isinstance(details.get("location"), dict) else {}
+    lat = _float(loc.get("lat", loc.get("latitude")))
+    lng = _float(loc.get("lng", loc.get("longitude")))
+    if place_name:
+        return {"name": place_name, "lat": lat, "lng": lng}
+    return None
 
 
 def _fill_full(story_id: str) -> None:

@@ -31,7 +31,12 @@ function resolveAudio(audioPath) {
 async function sendOne(sock, payload) {
   if (payload.type === "audio" && payload.audio_path) {
     const audio = await fs.readFile(resolveAudio(payload.audio_path));
-    await sock.sendMessage(payload.group_jid, { audio, mimetype: "audio/mpeg" });
+    const opus = String(payload.audio_path).toLowerCase().endsWith(".ogg");
+    await sock.sendMessage(payload.group_jid, {
+      audio,
+      mimetype: opus ? "audio/ogg; codecs=opus" : "audio/mpeg",
+      ptt: opus,
+    });
     return;
   }
   if (payload.text) {

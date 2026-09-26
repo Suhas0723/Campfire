@@ -1,0 +1,110 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: campfire
+      POSTGRES_PASSWORD: campfire
+      POSTGRES_DB: campfire
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campfire -d campfire"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment: &backend_env
+      DATABASE_URL: postgresql://campfire:campfire@postgres:5432/campfire
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      MEDIA_DIR: /data/media
+      PUBLIC_APP_URL: http://localhost:5173
+      SECRET_KEY: ${SECRET_KEY:-dev-change-me}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
+      DEFAULT_TRIP_TIMEZONE: ${DEFAULT_TRIP_TIMEZONE:-America/Los_Angeles}
+      RECAP_HOUR: ${RECAP_HOUR:-21}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-}
+      ELEVENLABS_MODEL_ID: ${ELEVENLABS_MODEL_ID:-eleven_multilingual_v2}
+      BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
+      BACKBOARD_BASE_URL: ${BACKBOARD_BASE_URL:-}
+    ports:
+      - "5000:5000"
+    volumes:
+      - media_data:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery:
+    build: ./backend
+    command: celery -A app.celery_app:celery worker --beat --loglevel=info
+    environment: *backend_env
+    volumes:
+      - media_data:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ingest:
+    build: ./backend
+    command: python -m app.ingest_worker
+    environment: *backend_env
+    volumes:
+      - media_data:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  whatsapp:
+    build: ./whatsapp-service
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      MEDIA_DIR: /data/media
+      WHATSAPP_AUTH_DIR: /app/auth
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - whatsapp_auth:/app/auth
+      - media_data:/data/media
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_PROXY_TARGET: http://backend:5000
+      VITE_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  media_data:
+  whatsapp_auth:

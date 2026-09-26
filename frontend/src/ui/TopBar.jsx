@@ -25,7 +25,7 @@ export default function TopBar({ onOpen, canOpen = () => true, onEndNight, endin
       <div className="topbar-right">
         {onEndNight && (
           <button className="btn-night" type="button" onClick={onEndNight} disabled={endingNight}>
-            {endingNight ? 'Ending the night…' : 'End the night'}
+            {endingNight ? 'Sending tonight’s recap…' : 'Tonight’s recap'}
           </button>
         )}
         {nightNote && <span className="night-note">{nightNote}</span>}

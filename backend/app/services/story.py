@@ -322,6 +322,9 @@ def format_messages(messages: list, zone: ZoneInfo) -> str:
 def _fill_nightly(story_id: str) -> None:
     story = _load_story(story_id)
     trip = story.trip
+    # Snapshot before any writes. A recap must not close the trip.
+    keep_status = trip.status
+    keep_ended_at = trip.ended_at
     messages = _messages_for_day(trip.id, story.for_date)
     _ensure_transcripts(messages)
     if not messages:
@@ -402,10 +405,12 @@ def _fill_nightly(story_id: str) -> None:
     story.segments = segments
     story.audio_path = recap_path
     story.status = "ready"
+    trip.status = keep_status
+    trip.ended_at = keep_ended_at
     _upsert_locations(trip, segments)
     db.session.commit()
     if recap_path:
-        _post_audio(group_jid, "Here's tonight's campfire.", recap_path)
+        _post_audio(group_jid, "Here's tonight's recap. The trip is still open — only /campfire end closes it.", recap_path)
     if muse_result:
         try:
             publish_outbound(group_jid, message_type="text", text=format_whatsapp_text(muse_result))

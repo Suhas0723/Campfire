@@ -1,0 +1,108 @@
+{
+  "trip": {
+    "title": "Desert trip",
+    "place": "Joshua Tree National Park",
+    "dateRange": "Mar 13 – 16, 2026",
+    "nights": 3,
+    "crew": ["Ana", "Priya", "Dev", "Marcus", "Jules"],
+    "messages": 1284,
+    "voiceNotes": 37,
+    "photoCount": 64,
+    "storyLength": "18:40"
+  },
+  "nightly": [
+    {
+      "id": "n1",
+      "night": "Night one",
+      "date": "Fri, Mar 13",
+      "title": "Jumbo Rocks and the tent that fought back",
+      "duration": "4:12"
+    },
+    {
+      "id": "n2",
+      "night": "Night two",
+      "date": "Sat, Mar 14",
+      "title": "Arch Rock at golden hour, and Marcus's s'mores theory",
+      "duration": "5:48"
+    },
+    {
+      "id": "n3",
+      "night": "Night three",
+      "date": "Sun, Mar 15",
+      "title": "Ryan Mountain, sore legs, one last fire",
+      "duration": "3:56"
+    }
+  ],
+  "sideQuests": [
+    {
+      "id": "q1",
+      "who": "Priya & Dev",
+      "title": "The long way back from Hidden Valley",
+      "duration": "2:34",
+      "blurb": "They missed the loop turnoff, found a lizard the size of a shoe, and arrived 40 minutes late with no regrets."
+    }
+  ],
+  "behindTheCamera": {
+    "photographer": "Ana",
+    "taken": 41,
+    "total": 64,
+    "appearances": 1,
+    "line": "Ana took 41 of your 64 photos. She's in exactly one."
+  },
+  "photos": [
+    { "id": "p1", "label": "Sunrise over Jumbo Rocks", "by": "Ana", "tilt": -4 },
+    { "id": "p2", "label": "Marcus vs. the tent poles", "by": "Ana", "tilt": 3 },
+    { "id": "p3", "label": "Arch Rock, everyone squinting", "by": "Jules", "tilt": -2 },
+    { "id": "p4", "label": "The only photo of Ana", "by": "Dev", "tilt": 5 }
+  ],
+  "route": [
+    { "id": "jumbo", "name": "Jumbo Rocks", "x": 150, "y": 330 },
+    { "id": "hidden", "name": "Hidden Valley", "x": 370, "y": 170 },
+    { "id": "arch", "name": "Arch Rock", "x": 640, "y": 300 },
+    { "id": "ryan", "name": "Ryan Mountain", "x": 860, "y": 140 }
+  ],
+  "narration": [
+    {
+      "stop": "jumbo",
+      "speaker": "Jules",
+      "line": "We rolled into Jumbo Rocks after dark, and the first tent went up inside out.",
+      "voice": "okay who packed the instructions"
+    },
+    {
+      "stop": "hidden",
+      "speaker": "Priya",
+      "line": "By morning Hidden Valley was glowing, and Priya and Dev were already lost in it.",
+      "voice": "we are NOT lost we are exploring"
+    },
+    {
+      "stop": "arch",
+      "speaker": "Marcus",
+      "line": "At Arch Rock, Marcus explained his s'mores theory to anyone who stood still.",
+      "voice": "the marshmallow has to be the last layer, trust me"
+    },
+    {
+      "stop": "ryan",
+      "speaker": "Ana",
+      "line": "On Ryan Mountain the wind took Dev's hat, and nobody has let him forget it.",
+      "voice": "somebody get a photo of this, not me for once"
+    }
+  ],
+  "nextFire": {
+    "place": "Anza-Borrego",
+    "headline": "Anza-Borrego, two hours closer and free to park",
+    "drive": "2h 10m from LA",
+    "when": "Late April, before the heat",
+    "reasons": [
+      { "who": "Dev", "quote": "next time can we not drive four hours each way" },
+      { "who": "Priya", "quote": "the $30 parking pass hurt my soul" },
+      { "who": "Marcus", "quote": "I want to see the wildflowers everyone keeps posting" },
+      { "who": "Jules", "quote": "somewhere we can actually see stars" }
+    ],
+    "alternatives": ["Mojave Preserve", "Big Sur (if we're feeling rich)"]
+  },
+  "offTheRecord": [
+    "Marcus's 2 a.m. voice note about the coyote",
+    "The group vote on who snores",
+    "Photos Dev asked us to delete"
+  ]
+}

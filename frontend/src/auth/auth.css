@@ -268,6 +268,30 @@
   gap: 10px;
 }
 
+.btn-night {
+  cursor: pointer;
+  padding: 7px 14px 6px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--cream);
+  background: var(--bark);
+  border: 2px solid var(--bark-dark);
+  border-bottom-width: 4px;
+  border-radius: 9px;
+}
+
+.btn-night:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.night-note {
+  max-width: 220px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bark-dark);
+}
+
 .user-menu {
   position: relative;
 }

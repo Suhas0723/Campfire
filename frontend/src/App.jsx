@@ -11,7 +11,7 @@ import Window from './ui/Window.jsx';
 import DesertTrip from './windows/DesertTrip.jsx';
 import StoryPlayer from './windows/StoryPlayer.jsx';
 import NextFire from './windows/NextFire.jsx';
-import { NightlyRecaps, OffTheRecord, Settings, SideQuests, StartTrip, TalkToCampfire } from './windows/Extras.jsx';
+import { NightlyRecaps, OffTheRecord, Settings, SideQuests, StartTrip } from './windows/Extras.jsx';
 import { KYOTO_TRIP } from './scenes/kyoto/index.js';
 import { useMyTrips, usePlayback } from './auth/useMyTrips.js';
 import YourFires from './auth/YourFires.jsx';
@@ -20,7 +20,7 @@ const fromRight = (w, y) => () => ({ x: Math.max(130, window.innerWidth - w - 13
 const centered = (w, y) => () => ({ x: Math.max(120, Math.round((window.innerWidth - w) / 2)), y });
 
 // Extras built on the Desert trip's sample content; only its crew sees them.
-const DESERT_ONLY = new Set(['nightly', 'quests', 'talk', 'offrecord']);
+const DESERT_ONLY = new Set(['nightly', 'quests', 'offrecord']);
 
 const WINDOWS = {
   fires: { title: 'Your fires', width: 640, pos: centered(640, 84), Body: YourFires },
@@ -29,7 +29,6 @@ const WINDOWS = {
   nightly: { title: 'Nightly recaps', width: 460, pos: { x: 190, y: 120 }, Body: NightlyRecaps },
   quests: { title: 'Side quests', width: 440, pos: { x: 230, y: 160 }, Body: SideQuests },
   next: { title: 'Next fire', width: 520, pos: fromRight(520, 96), Body: NextFire },
-  talk: { title: 'Talk to Campfire', width: 420, pos: { x: 270, y: 190 }, Body: TalkToCampfire },
   settings: { title: 'Settings', width: 420, pos: fromRight(420, 90), Body: Settings },
   offrecord: { title: 'Off the record', width: 400, pos: fromRight(400, 170), Body: OffTheRecord },
   start: { title: 'Start a trip', width: 440, pos: fromRight(440, 110), Body: StartTrip },

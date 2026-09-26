@@ -12,7 +12,9 @@ backend/            Flask, Postgres/pgvector, Celery, model clients
 frontend/           React playback app (Vite)
 docs/               Product and architecture notes
 scripts/            Local start helpers
+deploy/             Production Caddy image (HTTPS + built frontend)
 docker-compose.yml
+docker-compose.prod.yml
 ```
 
 ## Run it
@@ -44,7 +46,32 @@ Copy `.env.example` to `.env` when you add ChatGPT, ElevenLabs, or Backboard key
 | Postgres | localhost:5432 (`campfire` / `campfire`) |
 | Redis | localhost:6379 |
 
-On Windows, `scripts/dev.ps1` copies `.env.example` when `.env` is missing and starts Compose. On the VPS, `scripts/dev.sh` does the same.
+On Windows, `scripts/dev.ps1` copies `.env.example` when `.env` is missing and starts Compose. On Linux, `scripts/dev.sh` does the same for this local stack.
+
+## Production (Vultr)
+
+Use a 2 vCPU / 4 GB Ubuntu 24.04 Cloud Compute instance. Photos, voice notes, and narration accumulate in the `media_data` volume.
+
+1. Install Docker Engine and the Compose plugin.
+2. Point an `A` record for the domain (and `www`, if you use it) at the server's IPv4 address. In the Vultr firewall or `ufw`, allow 22, 80, and 443 only. Leave 5432, 6379, and 5000 closed.
+3. Clone this repo, copy `.env.example` to `.env`, and set a long `SECRET_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, and `DOMAIN` (hostname only, no scheme). Set `PUBLIC_APP_URL` to `https://` plus that hostname, and set `SESSION_COOKIE_SECURE=true` and `BEHIND_PROXY=true`.
+4. After the name resolves to this server:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Caddy serves the built playback app and proxies `/api` to Flask on one HTTPS hostname. Certificate issuance fails if port 80 is closed or DNS does not point here yet.
+
+5. Link WhatsApp once:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f whatsapp
+```
+
+Scan the QR from WhatsApp → Linked devices. The `whatsapp_auth` volume keeps that session across rebuilds. Use a spare number. Baileys is an unofficial client, and a datacenter IP can be logged out.
+
+Back up the `postgres_data`, `media_data`, and `whatsapp_auth` volumes. Losing `whatsapp_auth` means scanning the QR again. Postgres and Redis stay on the Docker network; the only published ports are 80 and 443. A reboot brings the stack back (`restart: unless-stopped`). Local `docker compose up` is unchanged.
 
 ## WhatsApp commands
 

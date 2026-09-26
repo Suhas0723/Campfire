@@ -39,4 +39,5 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").strip().lower() in {"1", "true", "yes"}
+    BEHIND_PROXY = os.environ.get("BEHIND_PROXY", "false").strip().lower() in {"1", "true", "yes"}
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)

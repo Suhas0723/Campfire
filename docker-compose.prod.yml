@@ -19,6 +19,7 @@ services:
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Set PUBLIC_APP_URL to https://your-domain}
       SESSION_COOKIE_SECURE: "true"
       BEHIND_PROXY: "true"
+      DEMO_MODE: "false"
 
   celery:
     restart: unless-stopped

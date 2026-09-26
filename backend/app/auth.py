@@ -5,6 +5,7 @@ import uuid
 
 import phonenumbers
 from flask import g, jsonify, session
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models import Trip, User
@@ -38,6 +39,23 @@ def jid_to_phone(jid: str) -> str | None:
 
 def user_by_phone(phone: str) -> User | None:
     return db.session.query(User).filter_by(whatsapp_jid=phone_to_jid(phone)).one_or_none()
+
+
+def ensure_user(phone: str) -> User:
+    """The person behind this number, created on their first successful code."""
+    user = user_by_phone(phone)
+    if user is not None:
+        return user
+    user = User(whatsapp_jid=phone_to_jid(phone), display_name=phone)
+    db.session.add(user)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        user = user_by_phone(phone)
+        if user is None:
+            raise
+    return user
 
 
 def user_to_dict(user: User) -> dict:

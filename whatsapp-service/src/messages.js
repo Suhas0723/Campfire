@@ -40,6 +40,10 @@ function quotedId(content) {
   );
 }
 
+function phoneJid(candidates) {
+  return candidates.find((jid) => typeof jid === "string" && jid.endsWith("@s.whatsapp.net")) || null;
+}
+
 export function describeMessage(msg) {
   const key = msg.key || {};
   const jid = key.remoteJid;
@@ -84,7 +88,7 @@ export function describeMessage(msg) {
   return {
     isGroup: jid.endsWith("@g.us"),
     jid,
-    senderJid: key.participant || jid,
+    senderJid: phoneJid([key.participantAlt, key.participantPn, key.senderPn, key.participant, jid]) || key.participant || jid,
     messageId: key.id,
     pushName: msg.pushName || "",
     timestamp: Number.isFinite(timestamp) ? timestamp : 0,

@@ -451,6 +451,76 @@ button {
   background: var(--ember);
 }
 
+.campfire-play:disabled {
+  cursor: not-allowed;
+  background: var(--wood-light);
+}
+
+.state-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.state-msg strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+}
+
+.state-msg p {
+  margin: 0;
+  max-width: 340px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--bark);
+}
+
+.sample-chip {
+  margin: 0 0 14px;
+  padding: 6px 10px;
+  border: 1.5px dashed var(--bark-dark);
+  border-radius: 8px;
+  background: rgba(255, 209, 102, 0.4);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.badge-sample {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1.5px dashed var(--wood);
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: var(--wood);
+}
+
+.live-chip {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--fire-red);
+  color: var(--cream);
+  letter-spacing: 0.04em;
+}
+
+.rationale {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .campfire-play:active {
   transform: translateY(3px);
   border-bottom-width: 2px;
@@ -860,12 +930,70 @@ button {
   to { transform: scaleY(1); }
 }
 
-.voice-quote {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.voice-avatar.is-narrator {
+  background: var(--cream);
+}
+
+.photo-pop {
+  position: absolute;
+  top: 110px;
+  right: 40px;
+  width: 190px;
+  margin: 0;
+  padding: 8px 8px 0;
+  background: var(--cream);
+  border: 2px solid var(--bark-dark);
+  border-radius: 3px;
+  box-shadow: 4px 4px 0 rgba(59, 36, 22, 0.3);
+  transform: rotate(4deg);
+  animation: fade-up 300ms ease-out;
+}
+
+.photo-pop.on-left {
+  right: auto;
+  left: 40px;
+  transform: rotate(-4deg);
+}
+
+.photo-pop img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1.5px solid var(--bark-dark);
+}
+
+.photo-pop figcaption {
+  padding: 6px 0 8px;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-style: italic;
+  font-size: 13px;
+  text-align: center;
   color: var(--bark);
+}
+
+.player-message {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  text-align: center;
+  background: var(--parchment);
+  border-radius: 0 0 8px 8px;
+}
+
+.player-message p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--bark);
+}
+
+.player-exit.static {
+  position: static;
+  margin-top: 10px;
 }
 
 .subtitle {

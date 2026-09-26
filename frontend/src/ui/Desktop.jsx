@@ -22,12 +22,12 @@ function DesktopIcon({ id, label, Icon, active, onOpen }) {
   );
 }
 
-export default function Desktop({ openIds, onOpen }) {
+export default function Desktop({ openIds, onOpen, labels = {} }) {
   return (
     <>
       <div className="desk-column desk-left">
         {LEFT_ICONS.map((i) => (
-          <DesktopIcon key={i.id} {...i} active={openIds.includes(i.id)} onOpen={onOpen} />
+          <DesktopIcon key={i.id} {...i} label={labels[i.id] || i.label} active={openIds.includes(i.id)} onOpen={onOpen} />
         ))}
       </div>
       <div className="desk-column desk-right">

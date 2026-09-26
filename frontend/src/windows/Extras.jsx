@@ -2,7 +2,7 @@ import { useState } from 'react';
 import data from '../mock/trip.json';
 import { BookIcon, FlameLogo, FootprintsIcon, MapIcon, MoonIcon, PlayIcon } from '../ui/icons.jsx';
 
-const { nightly, sideQuests, trip, offTheRecord } = data;
+const { nightly, sideQuests, trip, stats, offTheRecord } = data;
 
 export function NightlyRecaps({ onPlay }) {
   return (
@@ -52,7 +52,7 @@ export function SideQuests({ onPlay }) {
 }
 
 const SEED_CHAT = [
-  { from: 'campfire', text: `I've read all ${trip.messages.toLocaleString()} messages from the ${trip.title.toLowerCase()}. Ask me anything about it.` },
+  { from: 'campfire', text: `I've read all ${stats.messages.toLocaleString()} messages from the ${trip.name.toLowerCase()}. Ask me anything about it.` },
   { from: 'me', text: 'Who got lost the most?' },
   { from: 'campfire', text: 'Priya and Dev, by a mile. They took the long way back from Hidden Valley and turned it into a side quest.' },
 ];

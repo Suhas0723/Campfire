@@ -1,15 +1,114 @@
 {
   "trip": {
-    "title": "Desert trip",
+    "id": "sample",
+    "name": "Desert trip",
+    "status": "ended",
+    "started_at": "2026-03-13T20:00:00Z",
+    "ended_at": "2026-03-16T20:00:00Z",
+    "group_name": "Desert trip crew",
     "place": "Joshua Tree National Park",
-    "dateRange": "Mar 13 – 16, 2026",
-    "nights": 3,
-    "crew": ["Ana", "Priya", "Dev", "Marcus", "Jules"],
+    "crew": ["Ana", "Priya", "Dev", "Marcus", "Jules"]
+  },
+  "stats": {
     "messages": 1284,
     "voiceNotes": 37,
-    "photoCount": 64,
-    "storyLength": "18:40"
+    "photoCount": 64
   },
+  "locations": [
+    { "id": "jumbo", "name": "Jumbo Rocks", "latitude": 33.9917, "longitude": -116.0625 },
+    { "id": "hidden", "name": "Hidden Valley", "latitude": 34.0126, "longitude": -116.1686 },
+    { "id": "arch", "name": "Arch Rock", "latitude": 33.987, "longitude": -116.0167 },
+    { "id": "ryan", "name": "Ryan Mountain", "latitude": 34.0257, "longitude": -116.1363 }
+  ],
+  "segments": [
+    {
+      "order": 0,
+      "kind": "narration",
+      "text": "We rolled into Jumbo Rocks after dark, and the first tent went up inside out.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Jumbo Rocks", "lat": 33.9917, "lng": -116.0625 },
+      "speaker": null
+    },
+    {
+      "order": 1,
+      "kind": "voice_note",
+      "text": "Okay, who packed the instructions?",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Jumbo Rocks", "lat": 33.9917, "lng": -116.0625 },
+      "speaker": "Jules"
+    },
+    {
+      "order": 2,
+      "kind": "narration",
+      "text": "By morning Hidden Valley was glowing, and Priya and Dev were already lost in it.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Hidden Valley", "lat": 34.0126, "lng": -116.1686 },
+      "speaker": null
+    },
+    {
+      "order": 3,
+      "kind": "voice_note",
+      "text": "We are not lost. We are exploring.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Hidden Valley", "lat": 34.0126, "lng": -116.1686 },
+      "speaker": "Priya"
+    },
+    {
+      "order": 4,
+      "kind": "narration",
+      "text": "At Arch Rock, Marcus explained his s'mores theory to anyone who stood still.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Arch Rock", "lat": 33.987, "lng": -116.0167 },
+      "speaker": null
+    },
+    {
+      "order": 5,
+      "kind": "photo",
+      "text": "Arch Rock at golden hour. Everyone squinting, nobody complaining.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Arch Rock", "lat": 33.987, "lng": -116.0167 },
+      "speaker": "Jules"
+    },
+    {
+      "order": 6,
+      "kind": "narration",
+      "text": "On Ryan Mountain the wind took Dev's hat, and nobody has let him forget it.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Ryan Mountain", "lat": 34.0257, "lng": -116.1363 },
+      "speaker": null
+    },
+    {
+      "order": 7,
+      "kind": "voice_note",
+      "text": "Somebody get a photo of this. Not me, for once.",
+      "audio_url": null,
+      "photo_url": null,
+      "location": { "name": "Ryan Mountain", "lat": 34.0257, "lng": -116.1363 },
+      "speaker": "Ana"
+    }
+  ],
+  "suggestions": [
+    {
+      "body": "Anza-Borrego, two hours closer and free to park",
+      "rationale": "The chat kept coming back to the long drive and the parking fee, and everyone wanted wildflowers and dark skies.",
+      "drive": "2h 10m from LA",
+      "when": "Late April, before the heat",
+      "reasons": [
+        { "who": "Dev", "quote": "next time can we not drive four hours each way" },
+        { "who": "Priya", "quote": "the $30 parking pass hurt my soul" },
+        { "who": "Marcus", "quote": "I want to see the wildflowers everyone keeps posting" },
+        { "who": "Jules", "quote": "somewhere we can actually see stars" }
+      ],
+      "alternatives": ["Mojave Preserve", "Big Sur (if we're feeling rich)"]
+    }
+  ],
   "nightly": [
     {
       "id": "n1",
@@ -55,51 +154,6 @@
     { "id": "p3", "label": "Arch Rock, everyone squinting", "by": "Jules", "tilt": -2 },
     { "id": "p4", "label": "The only photo of Ana", "by": "Dev", "tilt": 5 }
   ],
-  "route": [
-    { "id": "jumbo", "name": "Jumbo Rocks", "x": 150, "y": 330 },
-    { "id": "hidden", "name": "Hidden Valley", "x": 370, "y": 170 },
-    { "id": "arch", "name": "Arch Rock", "x": 640, "y": 300 },
-    { "id": "ryan", "name": "Ryan Mountain", "x": 860, "y": 140 }
-  ],
-  "narration": [
-    {
-      "stop": "jumbo",
-      "speaker": "Jules",
-      "line": "We rolled into Jumbo Rocks after dark, and the first tent went up inside out.",
-      "voice": "okay who packed the instructions"
-    },
-    {
-      "stop": "hidden",
-      "speaker": "Priya",
-      "line": "By morning Hidden Valley was glowing, and Priya and Dev were already lost in it.",
-      "voice": "we are NOT lost we are exploring"
-    },
-    {
-      "stop": "arch",
-      "speaker": "Marcus",
-      "line": "At Arch Rock, Marcus explained his s'mores theory to anyone who stood still.",
-      "voice": "the marshmallow has to be the last layer, trust me"
-    },
-    {
-      "stop": "ryan",
-      "speaker": "Ana",
-      "line": "On Ryan Mountain the wind took Dev's hat, and nobody has let him forget it.",
-      "voice": "somebody get a photo of this, not me for once"
-    }
-  ],
-  "nextFire": {
-    "place": "Anza-Borrego",
-    "headline": "Anza-Borrego, two hours closer and free to park",
-    "drive": "2h 10m from LA",
-    "when": "Late April, before the heat",
-    "reasons": [
-      { "who": "Dev", "quote": "next time can we not drive four hours each way" },
-      { "who": "Priya", "quote": "the $30 parking pass hurt my soul" },
-      { "who": "Marcus", "quote": "I want to see the wildflowers everyone keeps posting" },
-      { "who": "Jules", "quote": "somewhere we can actually see stars" }
-    ],
-    "alternatives": ["Mojave Preserve", "Big Sur (if we're feeling rich)"]
-  },
   "offTheRecord": [
     "Marcus's 2 a.m. voice note about the coyote",
     "The group vote on who snores",

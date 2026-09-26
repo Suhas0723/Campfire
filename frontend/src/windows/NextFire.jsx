@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import data from '../mock/trip.json';
 import { blob, roughPoly, c } from '../scene/shape.js';
-import { CompassIcon, PinIcon } from '../ui/icons.jsx';
+import { CompassIcon, FlameLogo, PinIcon } from '../ui/icons.jsx';
 
-const { nextFire, trip } = data;
 const OUT = { stroke: c('bark-dark'), strokeLinejoin: 'round', strokeLinecap: 'round' };
 
 function Postcard() {
@@ -30,9 +28,24 @@ function Postcard() {
   );
 }
 
-export default function NextFire() {
+export default function NextFire({ data }) {
   const [sent, setSent] = useState(false);
-  const options = [nextFire.place, ...nextFire.alternatives];
+
+  if (data.status !== 'ready') return null;
+  const [pick, ...others] = data.suggestions || [];
+  if (!pick) {
+    return (
+      <div className="state-msg">
+        <FlameLogo size={40} />
+        <strong>No suggestion yet.</strong>
+        <p>Campfire suggests the next trip once this one ends.</p>
+      </div>
+    );
+  }
+
+  const alternatives = [...others.map((s) => s.body), ...(pick.alternatives || [])];
+  const options = [pick.body, ...alternatives];
+  const chips = [pick.drive, pick.when].filter(Boolean);
 
   return (
     <div className="nextfire">
@@ -46,31 +59,37 @@ export default function NextFire() {
           </span>
         </div>
         <div className="suggestion-body">
-          <h2 className="suggestion-title">{nextFire.headline}</h2>
-          <div className="chip-row">
-            <span className="chip">
-              <PinIcon size={14} /> {nextFire.drive}
-            </span>
-            <span className="chip">{nextFire.when}</span>
-            <span className="chip">Free parking</span>
-          </div>
+          <h2 className="suggestion-title">{pick.body}</h2>
+          {chips.length > 0 && (
+            <div className="chip-row">
+              {chips.map((chip, i) => (
+                <span className="chip" key={chip}>
+                  {i === 0 && <PinIcon size={14} />} {chip}
+                </span>
+              ))}
+            </div>
+          )}
 
           <h3 className="reasons-title">Pulled from your chat</h3>
-          <ul className="reasons">
-            {nextFire.reasons.map((r) => (
-              <li key={r.who}>
-                <span className="reason-who">{r.who}</span>
-                <q>{r.quote}</q>
-              </li>
-            ))}
-          </ul>
+          {pick.reasons?.length ? (
+            <ul className="reasons">
+              {pick.reasons.map((r) => (
+                <li key={r.who}>
+                  <span className="reason-who">{r.who}</span>
+                  <q>{r.quote}</q>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="rationale">{pick.rationale}</p>
+          )}
         </div>
       </article>
 
       {sent ? (
         <div className="poll-sent" role="status">
           <p className="poll-sent-head">
-            Poll sent to the <strong>{trip.title}</strong> chat
+            Poll sent to the <strong>{data.trip.group_name || data.trip.name}</strong> chat
           </p>
           <ul className="poll-preview">
             {options.map((o, i) => (
@@ -90,7 +109,7 @@ export default function NextFire() {
           <button className="btn-primary lg" onClick={() => setSent(true)}>
             Send to the group as a poll
           </button>
-          <span className="nextfire-hint">Also in the poll: {nextFire.alternatives.join(', ')}</span>
+          {alternatives.length > 0 && <span className="nextfire-hint">Also in the poll: {alternatives.join(', ')}</span>}
         </div>
       )}
     </div>

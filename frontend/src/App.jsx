@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useMatch, useNavigate } from 'react-router-dom';
 import Scene from './scene/Scene.jsx';
 import TopBar from './ui/TopBar.jsx';
 import Desktop from './ui/Desktop.jsx';
@@ -7,6 +8,7 @@ import DesertTrip from './windows/DesertTrip.jsx';
 import StoryPlayer from './windows/StoryPlayer.jsx';
 import NextFire from './windows/NextFire.jsx';
 import { NightlyRecaps, OffTheRecord, Settings, SideQuests, StartTrip, TalkToCampfire } from './windows/Extras.jsx';
+import { useTrip } from './data/useTrip.js';
 
 const fromRight = (w, y) => () => ({ x: Math.max(130, window.innerWidth - w - 130), y });
 
@@ -27,8 +29,13 @@ const initialPos = (id) => {
 };
 
 export default function App() {
+  const navigate = useNavigate();
+  const playMatch = useMatch('/play/:tripId');
+  const playingId = playMatch?.params.tripId;
+  const tripData = useTrip(playingId);
+  const tripName = tripData.status === 'ready' ? tripData.trip.name : WINDOWS.trip.title;
+
   const [open, setOpen] = useState([{ id: 'trip', pos: initialPos('trip') }]);
-  const [playing, setPlaying] = useState(false);
 
   const focus = useCallback(
     (id) => setOpen((ws) => (ws[ws.length - 1]?.id === id ? ws : [...ws.filter((w) => w.id !== id), ws.find((w) => w.id === id)])),
@@ -44,32 +51,41 @@ export default function App() {
     });
   }, []);
 
-  const close = useCallback((id) => {
-    setOpen((ws) => ws.filter((w) => w.id !== id));
-    if (id === 'trip') setPlaying(false);
-  }, []);
+  useEffect(() => {
+    if (playingId) openWindow('trip');
+  }, [playingId, openWindow]);
+
+  const exitPlayer = useCallback(() => navigate('/'), [navigate]);
+
+  const close = useCallback(
+    (id) => {
+      setOpen((ws) => ws.filter((w) => w.id !== id));
+      if (id === 'trip' && playingId) exitPlayer();
+    },
+    [playingId, exitPlayer],
+  );
 
   const move = useCallback((id, pos) => setOpen((ws) => ws.map((w) => (w.id === id ? { ...w, pos } : w))), []);
 
   const play = useCallback(() => {
-    openWindow('trip');
-    setPlaying(true);
-  }, [openWindow]);
+    if (tripData.status === 'ready') navigate(`/play/${tripData.trip.id}`);
+  }, [navigate, tripData]);
 
   return (
     <>
       <Scene />
       <TopBar onOpen={openWindow} />
-      <Desktop openIds={open.map((w) => w.id)} onOpen={openWindow} />
+      <Desktop openIds={open.map((w) => w.id)} onOpen={openWindow} labels={{ trip: tripName }} />
       {open.map((w, i) => {
         const cfg = WINDOWS[w.id];
-        const full = w.id === 'trip' && playing;
+        const full = w.id === 'trip' && Boolean(playingId);
+        const title = w.id === 'trip' ? tripName : cfg.title;
         const { Body } = cfg;
         return (
           <Window
             key={full ? `${w.id}-full` : w.id}
             id={w.id}
-            title={full ? `${cfg.title} · Sit around the campfire` : cfg.title}
+            title={full ? `${title} · Sit around the campfire` : title}
             width={cfg.width}
             pos={w.pos}
             z={full ? 40 : 10 + i}
@@ -78,7 +94,7 @@ export default function App() {
             onFocus={focus}
             onClose={close}
           >
-            {full ? <StoryPlayer onExit={() => setPlaying(false)} /> : <Body onOpen={openWindow} onPlay={play} />}
+            {full ? <StoryPlayer data={tripData} onExit={exitPlayer} /> : <Body data={tripData} onOpen={openWindow} onPlay={play} />}
           </Window>
         );
       })}

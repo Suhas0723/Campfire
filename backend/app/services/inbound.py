@@ -110,8 +110,13 @@ def _handle_command(payload: dict, command: str) -> None:
             _join(trip, user)
             reply = (
                 "Campfire is listening for this trip. Each night I'll post a short recap "
-                "from what you already send here. /campfire off the record pauses me. "
-                "/campfire end closes the trip."
+                "from what you already send here.\n"
+                "• /campfire start - start listening to this trip\n"
+                "• /campfire end - stop listening and post the story link\n"
+                "• /campfire off the record - pause, and don't save anything until you're back\n"
+                "• /campfire on the record - start listening again\n"
+                "• /campfire forget - drop your last message, or reply to one of yours to drop that one\n"
+                "• /campfire help - show these commands"
             )
     elif command == "end":
         if trip is None:

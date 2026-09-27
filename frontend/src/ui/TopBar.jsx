@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FlameLogo } from './icons.jsx';
+import { CompassIcon, FlameLogo, LanternIcon } from './icons.jsx';
 import UserMenu from '../auth/UserMenu.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import useIsMobile from './useIsMobile.js';
 
-const NAV = [
-  { id: 'fires', label: 'Trips' },
-  { id: 'nightly', label: 'Nightly' },
-  { id: 'quests', label: 'Side quests' },
-  { id: 'next', label: 'Next fire' },
+const HEADER_NAV = [
+  { id: 'fires', label: 'Your fires', Icon: FlameLogo },
+  { id: 'next', label: 'Next fire', Icon: CompassIcon },
+  { id: 'settings', label: 'Settings', Icon: LanternIcon },
 ];
 
 function MenuIcon() {
@@ -92,14 +91,11 @@ export default function TopBar({ onOpen, canOpen = () => true, onEndNight, endin
   }
   return (
     <header className="topbar">
-      <button className="brand" onClick={() => onOpen('fires')}>
-        <FlameLogo size={28} />
-        <span>Campfire</span>
-      </button>
       <nav className="topnav" aria-label="Main">
-        {NAV.filter((n) => canOpen(n.id)).map((n) => (
-          <button key={n.id} className="topnav-link" onClick={() => onOpen(n.id)}>
-            {n.label}
+        {HEADER_NAV.filter((item) => canOpen(item.id)).map(({ id, label, Icon }) => (
+          <button key={id} className="topnav-link topnav-item" onClick={() => onOpen(id)}>
+            <Icon size={26} />
+            {label}
           </button>
         ))}
       </nav>

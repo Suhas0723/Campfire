@@ -1,26 +1,13 @@
-import { BookIcon, CompassIcon, FlameLogo, FootprintsIcon, LanternIcon, MapIcon, MoonIcon } from './icons.jsx';
-
-function FiresIcon({ size, className }) {
-  return (
-    <span className={className} style={{ display: 'inline-flex' }}>
-      <FlameLogo size={size} />
-    </span>
-  );
-}
+import { BookIcon, FootprintsIcon, MapIcon, MoonIcon } from './icons.jsx';
 
 const LEFT_ICONS = [
-  { id: 'fires', label: 'Your fires', Icon: FiresIcon },
   { id: 'trip', label: 'Desert trip', Icon: MapIcon },
   { id: 'kyoto', label: 'Kyoto spring break', Icon: MapIcon },
   { id: 'nightly', label: 'Nightly recaps', Icon: MoonIcon },
   { id: 'quests', label: 'Side quests', Icon: FootprintsIcon },
-  { id: 'next', label: 'Next fire', Icon: CompassIcon },
 ];
 
-const RIGHT_ICONS = [
-  { id: 'settings', label: 'Settings', Icon: LanternIcon },
-  { id: 'offrecord', label: 'Off the record', Icon: BookIcon },
-];
+const RIGHT_ICONS = [{ id: 'offrecord', label: 'Off the record', Icon: BookIcon }];
 
 function DesktopIcon({ id, label, Icon, active, onOpen }) {
   return (

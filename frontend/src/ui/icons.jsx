@@ -27,6 +27,18 @@ export function FlameLogo({ size = 30 }) {
   );
 }
 
+export function TentIcon(p) {
+  return (
+    <Icon {...p}>
+      <Shadow />
+      <path d="M8,46 L32,12 L56,46Z" style={{ ...OUT, fill: c('parchment') }} {...sw()} />
+      <path d="M32,12 L32,46" style={{ ...OUT, fill: 'none' }} {...sw(2)} />
+      <path d="M22,46 L32,30 L42,46Z" style={{ ...OUT, fill: c('bark') }} {...sw(2)} />
+      <path d="M8,46 L56,46" style={{ ...OUT, fill: 'none' }} {...sw()} />
+    </Icon>
+  );
+}
+
 export function MapIcon(p) {
   return (
     <Icon {...p}>

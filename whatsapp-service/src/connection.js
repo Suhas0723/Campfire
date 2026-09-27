@@ -83,10 +83,15 @@ export async function connectWhatsApp({ redis, onSocket, onMessage }) {
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    logger.info({ upsertType: type, count: messages.length, activeSession: mine === session }, "messages.upsert");
     if (mine !== session || type !== "notify") return;
     for (const msg of messages) {
       try {
         const described = describeMessage(msg);
+        logger.info(
+          { fromMe: Boolean(msg.key?.fromMe), type: described?.type || null, isGroup: described?.isGroup ?? null, dropped: !described },
+          "Inbound message described",
+        );
         if (!described || !(await allowed(redis, described))) continue;
 
         let mediaPath = null;

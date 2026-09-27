@@ -78,6 +78,7 @@ export async function deliverBatch(redis, getSocket, offset) {
       try {
         const payload = JSON.parse(data || "{}");
         const sent = await sendOne(socket, payload);
+        logger.info({ id, type: payload.type, sentId: sent?.key?.id || null }, "Outbound delivered");
         if (payload.client_ref && sent?.key?.id) {
           await redis.xadd(inboundStream, "*", "data", JSON.stringify({
             group_jid: payload.group_jid,

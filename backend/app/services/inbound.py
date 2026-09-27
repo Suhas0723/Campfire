@@ -158,6 +158,7 @@ def _handle_command(payload: dict, command: str) -> None:
 
     ended_trip_id = trip.id if command == "end" and trip is not None and trip.status == ENDED else None
     db.session.commit()
+    logger.info("Command %s handled for %s", command, group_jid)
     if ended_trip_id is not None:
         _enqueue_full_story(ended_trip_id)
     try:

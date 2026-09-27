@@ -695,6 +695,19 @@ button {
     var(--wood-light);
 }
 
+.polaroid-photo.has-photo {
+  padding: 0;
+  background: var(--wood-light);
+}
+
+.polaroid-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .polaroid-placeholder {
   position: absolute;
   top: 6px;

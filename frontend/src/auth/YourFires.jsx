@@ -10,7 +10,12 @@ function TripRow({ trip, tilt, onPlay }) {
   return (
     <li className="fire-row" aria-labelledby={titleId}>
       <div className="fire-row-cover">
-        <Polaroid label={trip.cover?.label || 'Not taken yet'} by={trip.cover?.by || 'nobody yet'} tilt={tilt} />
+        <Polaroid
+          label={trip.cover?.label || 'Not taken yet'}
+          by={trip.cover?.by || 'nobody yet'}
+          src={trip.cover?.url || undefined}
+          tilt={tilt}
+        />
       </div>
       <div className="fire-row-main">
         <h2 className="fire-row-title" id={titleId}>

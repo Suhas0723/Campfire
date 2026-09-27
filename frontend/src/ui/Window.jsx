@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { CloseIcon } from './icons.jsx';
 
-export default function Window({ id, title, pos, z, width, full = false, onMove, onFocus, onClose, children, className = '' }) {
+export default function Window({ id, title, pos, z, width, full = false, closable = true, onMove, onFocus, onClose, children, className = '' }) {
   const drag = useRef(null);
 
   const onPointerDown = (e) => {
@@ -38,9 +38,11 @@ export default function Window({ id, title, pos, z, width, full = false, onMove,
         onPointerCancel={endDrag}
       >
         <span className="window-title">{title}</span>
-        <button className="window-close" onClick={() => onClose(id)} aria-label={`Close ${title}`}>
-          <CloseIcon />
-        </button>
+        {closable && (
+          <button className="window-close" onClick={() => onClose(id)} aria-label={`Close ${title}`}>
+            <CloseIcon />
+          </button>
+        )}
       </header>
       <div className="window-body">{children}</div>
     </section>

@@ -5,7 +5,7 @@ from sqlalchemy import nulls_last
 
 from app.auth import current_user, login_required, trip_for_current_user, trips_for
 from app.extensions import db
-from app.models import Story, Suggestion, Trip
+from app.models import Message, Story, Suggestion, Trip
 from app.redis_streams import publish_outbound
 from app.services.story import prepare_end_night
 
@@ -48,9 +48,40 @@ def _segments_for(trip: Trip) -> list:
     return segments
 
 
-def _summary(trip: Trip) -> dict:
+def _chat_covers(trip_ids: list) -> dict:
+    """Latest photo each trip actually received in the group chat."""
+    if not trip_ids:
+        return {}
+    messages = (
+        db.session.query(Message)
+        .filter(
+            Message.trip_id.in_(trip_ids),
+            Message.type == "image",
+            Message.excluded.is_(False),
+            Message.media_path.isnot(None),
+        )
+        .order_by(Message.sent_at.desc())
+        .all()
+    )
+    covers = {}
+    for message in messages:
+        if message.trip_id in covers:
+            continue
+        sender = message.sender.display_name.split()[0] if message.sender and message.sender.display_name else ""
+        caption = " ".join((message.body or "").split())
+        covers[message.trip_id] = {
+            "label": caption[:80] if caption else "From the chat",
+            "by": sender or "the group",
+            "url": "/api/media/" + message.media_path.lstrip("/"),
+        }
+    return covers
+
+
+def _summary(trip: Trip, chat_cover: dict | None = None) -> dict:
     details = trip.details or {}
     location = details.get("location")
+    stored = details.get("cover") or None
+    cover = chat_cover if chat_cover and not (stored or {}).get("url") else stored
     return {
         "id": str(trip.id),
         "slug": trip.slug,
@@ -60,7 +91,7 @@ def _summary(trip: Trip) -> dict:
         "started_at": trip.started_at.isoformat() if trip.started_at else None,
         "ended_at": trip.ended_at.isoformat() if trip.ended_at else None,
         "participants": trip.crew(),
-        "cover": details.get("cover"),
+        "cover": cover,
         "story_ready": bool(_segments_for(trip)),
     }
 
@@ -69,7 +100,8 @@ def _summary(trip: Trip) -> dict:
 @login_required
 def list_trips():
     trips = trips_for(current_user()).order_by(Trip.started_at.desc()).all()
-    return jsonify([_summary(trip) for trip in trips])
+    covers = _chat_covers([trip.id for trip in trips])
+    return jsonify([_summary(trip, covers.get(trip.id)) for trip in trips])
 
 
 @bp.get("/trips/<uuid:trip_id>")

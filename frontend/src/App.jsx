@@ -227,6 +227,7 @@ function Workspace() {
             full={full}
             onMove={move}
             onFocus={focus}
+            closable={!(mobile && w.id === 'fires')}
             onClose={close}
           >
             {full ? (

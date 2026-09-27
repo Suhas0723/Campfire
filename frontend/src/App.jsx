@@ -137,30 +137,30 @@ function Workspace() {
     else if (!resolving && !leftPlayer.current) openWindow(playerWindow);
   }, [playingId, resolving, playerWindow, openWindow]);
 
+  const showHome = useCallback(() => {
+    setOpen([{ id: 'fires', pos: initialPos('fires') }]);
+  }, []);
+
   const exitPlayer = useCallback(() => {
     leftPlayer.current = true;
-    if (mobile) {
-      setOpen((ws) => {
-        const rest = ws.filter((w) => w.id !== playerWindow && w.id !== 'fires');
-        const fires = ws.find((w) => w.id === 'fires') || { id: 'fires', pos: initialPos('fires') };
-        return [...rest, fires];
-      });
-    } else if (playerWindow === 'trip' && playing !== desert) {
+    if (mobile) showHome();
+    else if (playerWindow === 'trip' && playing !== desert) {
       setOpen((ws) => ws.filter((w) => w.id !== 'trip'));
     }
     navigate('/');
-  }, [navigate, playerWindow, playing, desert, mobile]);
+  }, [navigate, playerWindow, playing, desert, mobile, showHome]);
 
   const close = useCallback(
     (id) => {
-      setOpen((ws) => {
-        const next = ws.filter((w) => w.id !== id);
-        if (mobile && next.length === 0) return [{ id: 'fires', pos: initialPos('fires') }];
-        return next;
-      });
+      if (mobile) {
+        if (id === playerWindow && playingId) exitPlayer();
+        else showHome();
+        return;
+      }
+      setOpen((ws) => ws.filter((w) => w.id !== id));
       if (id === playerWindow && playingId) exitPlayer();
     },
-    [playingId, playerWindow, exitPlayer, mobile],
+    [playingId, playerWindow, exitPlayer, mobile, showHome],
   );
 
   const move = useCallback((id, pos) => setOpen((ws) => ws.map((w) => (w.id === id ? { ...w, pos } : w))), []);

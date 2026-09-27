@@ -17,7 +17,7 @@ from app.redis_streams import publish_outbound
 from app.services.activities import get_activity_provider
 from app.services.llm import generate_text
 from app.services.memory import recall
-from app.services.payments import UserInstruction, get_payment_provider
+from app.services.payments import NotConfiguredError, PaymentDeclinedError, get_payment_provider
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +241,21 @@ def book_and_pay(booking_id: str) -> None:
             _decline(booking, f"provider_error: {exc}")
 
 
+def _billing_info(user: User, token: PaymentToken) -> dict:
+    parts = [part for part in (user.display_name or "Traveler").split() if part]
+    first = parts[0] if parts else "Traveler"
+    last = parts[-1] if len(parts) > 1 else "Traveler"
+    return {
+        "firstName": first,
+        "lastName": last,
+        "email": f"{first.casefold()}@example.com",
+        "country": "US",
+        "countryCallingCode": "1",
+        "phoneNumber": "5550100000",
+        "paymentInformation": {"instrumentIdentifier": {"id": token.token_ref}},
+    }
+
+
 def _complete_booking(booking: Booking) -> None:
     candidate = dict(booking.candidate_json or {})
     user = db.session.query(User).filter_by(whatsapp_jid=booking.approved_by).one_or_none()
@@ -265,28 +280,67 @@ def _complete_booking(booking: Booking) -> None:
         .order_by(BookingAuditLog.created_at.desc())
         .first()
     )
-    instruction = UserInstruction(
-        idempotency_key=f"booking:{booking.id}:approval:{approval.approval_message_id if approval else ''}",
-        item=str(candidate["name"]),
-        book_ref=str(candidate["book_ref"]),
-        amount=quote.price,
-        max_price=approved_price,
-        currency=quote.currency,
-        approval_message_id=approval.approval_message_id if approval else "",
-    )
-    payment_provider = get_payment_provider()
-    result = payment_provider.authorize(token_ref=token.token_ref, instruction=instruction)
-    _audit(
-        booking,
-        "authorization",
-        actor_jid=booking.approved_by,
-        approval_message_id=instruction.approval_message_id,
-        approval_payload=approval.approval_payload if approval else None,
-        provider_request=instruction.to_dict(),
-        provider_response=result.to_dict(),
-    )
-    if not result.approved or not result.authorization_ref:
-        _decline(booking, f"Payment authorization declined: {result.reason or 'unknown reason'}")
+    billing_info = _billing_info(user, token)
+    device_info = {
+        "applicationName": "Campfire",
+        "ipAddress": "127.0.0.1",
+        "deviceData": {"type": "Mobile", "brand": "Campfire"},
+    }
+    purchase_details = {
+        "amount": f"{quote.price:.2f}",
+        "max_price": f"{approved_price:.2f}",
+        "currency": quote.currency,
+        "item": str(candidate["name"]),
+        "book_ref": str(candidate["book_ref"]),
+        "customer_id": str(user.id),
+        "tokenized_card_number": token.token_ref,
+        "merchantName": "Campfire",
+        "merchantUrl": current_app.config.get("PUBLIC_APP_URL") or "https://example.com",
+        "merchantCountry": "US",
+        "code": f"bk{str(booking.id).replace('-', '')}"[:25],
+    }
+    # Intelligent Commerce order: enroll, purchase intent, credentials, then book
+    # the activity, then confirm the transaction. Confirmation is the Visa event
+    # that the purchase finished, so it is sent only after the activity is booked.
+    try:
+        payment_provider = get_payment_provider()
+        enrollment = payment_provider.enroll_card(str(user.id), billing_info, device_info)
+        _audit(
+            booking,
+            "card_enrolled",
+            actor_jid=booking.approved_by,
+            approval_message_id=approval.approval_message_id if approval else None,
+            approval_payload=approval.approval_payload if approval else None,
+            provider_request=billing_info,
+            provider_response=enrollment.to_dict(),
+        )
+        if enrollment.status != "ACTIVE":
+            db.session.commit()
+            _decline(booking, "Card enrollment is pending cardholder authentication.")
+            return
+        token.token_ref = enrollment.instrument_id
+        token.provider = payment_provider.name
+        intent = payment_provider.initiate_purchase_intent(enrollment.instrument_id, purchase_details)
+        _audit(
+            booking,
+            "purchase_intent",
+            actor_jid=booking.approved_by,
+            provider_request=purchase_details,
+            provider_response=intent.to_dict(),
+        )
+        credentials = payment_provider.retrieve_payment_credentials(intent.instruction_id)
+        _audit(
+            booking,
+            "payment_credentials",
+            actor_jid=booking.approved_by,
+            provider_request={"instructionId": intent.instruction_id},
+            provider_response=credentials.to_dict(),
+        )
+    except PaymentDeclinedError as exc:
+        _decline(booking, f"Payment declined: {exc.reason}")
+        return
+    except NotConfiguredError as exc:
+        _decline(booking, str(exc))
         return
     booking.status = "paid"
     try:
@@ -294,79 +348,82 @@ def _complete_booking(booking: Booking) -> None:
     except Exception as commit_error:
         db.session.rollback()
         booking = db.session.get(Booking, booking.id)
-        try:
-            void_result = payment_provider.void(
-                token_ref=token.token_ref,
-                authorization_ref=result.authorization_ref,
-            )
-            if not void_result.get("voided"):
-                raise RuntimeError("provider did not confirm the authorization release")
-        except Exception:
-            logger.exception("Could not release authorization after database commit failure")
-            _decline(
-                booking,
-                f"authorization_void_pending:{result.authorization_ref}",
-            )
-            return
-        _audit(
+        _decline(
             booking,
-            "authorization_voided",
-            actor_jid=booking.approved_by,
-            provider_request={"authorization_ref": result.authorization_ref, "reason": "paid_commit_failed"},
-            provider_response=void_result,
+            f"Payment state could not be saved; the Visa transaction was not confirmed: {commit_error}",
         )
-        db.session.commit()
-        _decline(booking, f"Payment state could not be saved; authorization was released: {commit_error}")
         return
     try:
         confirmation = get_activity_provider().confirm(
             str(candidate["book_ref"]),
-            authorization_ref=result.authorization_ref,
+            authorization_ref=intent.instruction_id,
             idempotency_key=f"booking-confirmation:{booking.id}",
         )
     except Exception as confirmation_error:
-        try:
-            void_result = payment_provider.void(
-                token_ref=token.token_ref,
-                authorization_ref=result.authorization_ref,
-            )
-        except Exception as void_error:
-            _audit(
-                booking,
-                "authorization_void_failed",
-                actor_jid=booking.approved_by,
-                provider_request={"authorization_ref": result.authorization_ref},
-                provider_response={"error": str(void_error)},
-            )
-            db.session.commit()
-            _decline(
-                booking,
-                f"booking confirmation failed; authorization_void_pending:{result.authorization_ref}",
-            )
-            return
-        if not void_result.get("voided"):
-            _audit(
-                booking,
-                "authorization_void_failed",
-                actor_jid=booking.approved_by,
-                provider_request={"authorization_ref": result.authorization_ref},
-                provider_response=void_result,
-            )
-            db.session.commit()
-            _decline(
-                booking,
-                f"booking confirmation failed; authorization_void_pending:{result.authorization_ref}",
-            )
-            return
         _audit(
             booking,
-            "authorization_voided",
+            "booking_confirmation_failed",
             actor_jid=booking.approved_by,
-            provider_request={"authorization_ref": result.authorization_ref},
-            provider_response=void_result,
+            provider_request={"instructionId": intent.instruction_id},
+            provider_response={"error": str(confirmation_error)},
         )
         db.session.commit()
-        raise RuntimeError("booking confirmation failed; the payment authorization was released") from confirmation_error
+        _decline(booking, "Booking confirmation failed; the Visa transaction was not confirmed.")
+        return
+    outcome = {
+        "type": "PURCHASE",
+        "totalAmount": f"{quote.price:.2f}",
+        "currency": quote.currency,
+        "merchantName": "Campfire",
+        "merchantUrl": purchase_details["merchantUrl"],
+        "merchantCountry": "US",
+        "code": purchase_details["code"],
+        "confirmationRef": confirmation.confirmation_ref,
+    }
+    try:
+        confirmed = payment_provider.confirm_transaction(intent.instruction_id, outcome)
+    except Exception as confirm_error:
+        booking.status = "confirmed"
+        booking.processing_started_at = None
+        booking.last_error = f"visa_confirmation_failed:{confirm_error}"
+        _audit(
+            booking,
+            "transaction_confirm_failed",
+            actor_jid=booking.approved_by,
+            provider_request=outcome,
+            provider_response={"error": str(confirm_error)},
+        )
+        db.session.commit()
+        _notify(
+            booking.trip.group.whatsapp_jid,
+            (
+                f"Booked: {candidate['name']} at {candidate['start_time']} — "
+                f"{quote.currency} {quote.price:.2f}. Confirmation {confirmation.confirmation_ref}. "
+                "Visa has not confirmed the transaction yet."
+            ),
+        )
+        return
+    _audit(
+        booking,
+        "transaction_confirmed",
+        actor_jid=booking.approved_by,
+        provider_request=outcome,
+        provider_response=confirmed.to_dict(),
+    )
+    if confirmed.status != "COMPLETED":
+        booking.status = "confirmed"
+        booking.processing_started_at = None
+        booking.last_error = f"visa_confirmation_status:{confirmed.status or 'unknown'}"
+        db.session.commit()
+        _notify(
+            booking.trip.group.whatsapp_jid,
+            (
+                f"Booked: {candidate['name']} at {candidate['start_time']} — "
+                f"{quote.currency} {quote.price:.2f}. Confirmation {confirmation.confirmation_ref}. "
+                f"Visa reported {confirmed.status or 'an unexpected status'}."
+            ),
+        )
+        return
     booking.status = "confirmed"
     booking.processing_started_at = None
     _audit(
@@ -435,39 +492,8 @@ def _decline(booking: Booking, reason: str) -> None:
 
 
 def reconcile_failed_voids() -> int:
-    """Retry only authorization release; never retry a declined booking."""
-    rows = db.session.query(Booking).filter(
-        Booking.status == "declined",
-        Booking.last_error.contains("authorization_void_pending:"),
-    ).all()
-    released = 0
-    for booking in rows:
-        authorization_ref = booking.last_error.rsplit("authorization_void_pending:", 1)[-1].strip()
-        user = db.session.query(User).filter_by(whatsapp_jid=booking.approved_by).one_or_none()
-        token = db.session.query(PaymentToken).filter_by(user_id=user.id).one_or_none() if user else None
-        if not token or not authorization_ref:
-            continue
-        try:
-            result = get_payment_provider().void(
-                token_ref=token.token_ref,
-                authorization_ref=authorization_ref,
-            )
-            if not result.get("voided"):
-                continue
-            booking.last_error = "booking_failed_authorization_released"
-            _audit(
-                booking,
-                "authorization_voided",
-                actor_jid=booking.approved_by,
-                provider_request={"authorization_ref": authorization_ref, "reconciliation": True},
-                provider_response=result,
-            )
-            released += 1
-        except Exception:
-            logger.exception("Could not release authorization for booking %s", booking.id)
-    if released:
-        db.session.commit()
-    return released
+    """No hold to release. Visa is told the purchase finished only after the activity is booked."""
+    return 0
 
 
 def _audit(booking: Booking, event_type: str, **fields) -> None:

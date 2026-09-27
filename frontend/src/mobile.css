@@ -353,6 +353,20 @@
     min-height: 0;
   }
 
+  .plan-wallet,
+  .plan-row {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-wallet-side,
+  .plan-row-side {
+    align-items: flex-start;
+  }
+
+  .plan-row {
+    flex-direction: column;
+  }
+
   body:has(.topbar) .fire-row {
     grid-template-columns: 72px minmax(0, 1fr);
     align-items: start;

@@ -5,12 +5,13 @@ Dev was only on the Kyoto trip, so he sees one story; Priya sees both, plus an u
 """
 
 import json
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.auth import phone_to_jid
 from app.extensions import db
-from app.models import ACTIVE, Group, Location, PaymentToken, Story, Suggestion, Trip, User
+from app.models import ACTIVE, Booking, BookingAuditLog, Group, Location, PaymentToken, Story, Suggestion, Trip, User
 
 DEMO_DIR = Path(__file__).resolve().parent / "demo"
 
@@ -116,10 +117,123 @@ def seed() -> None:
                 PaymentToken(
                     user_id=user.id,
                     token_ref=f"vic-demo-{name.casefold()}",
+                    provider="mock_vic",
                     spend_limit=500,
                     currency="USD",
                 )
             )
+    _seed_plans()
+
+
+def _seed_plans() -> None:
+    """One upcoming plan for the demo, so the Plans window is not empty."""
+    trip = db.session.query(Trip).filter_by(slug="big-sur").one_or_none()
+    if trip is None or db.session.query(Booking).filter_by(trip_id=trip.id).first():
+        return
+    deadline = datetime.now(timezone.utc) + timedelta(days=2)
+    waiting = str(uuid.uuid4())
+    booked = str(uuid.uuid4())
+    passed = str(uuid.uuid4())
+    db.session.add_all(
+        [
+            Booking(
+                trip_id=trip.id,
+                item_type="activity",
+                time_slot="morning",
+                candidate_json={
+                    "name": "Bixby Creek overlook walk",
+                    "item_type": "activity",
+                    "price": 18,
+                    "currency": "USD",
+                    "time_slot": "morning",
+                    "start_time": "09:00",
+                    "book_ref": "mock-bixby-0900",
+                },
+                status="proposed",
+                proposal_ref=waiting,
+                is_primary=True,
+                approval_deadline=deadline,
+            ),
+            Booking(
+                trip_id=trip.id,
+                item_type="activity",
+                time_slot="morning",
+                candidate_json={
+                    "name": "Pfeiffer Beach wander",
+                    "item_type": "activity",
+                    "price": 12,
+                    "currency": "USD",
+                    "time_slot": "morning",
+                    "start_time": "10:30",
+                    "book_ref": "mock-pfeiffer-1030",
+                },
+                status="proposed",
+                proposal_ref=waiting,
+                is_primary=False,
+                approval_deadline=deadline,
+            ),
+            Booking(
+                trip_id=trip.id,
+                item_type="restaurant",
+                time_slot="evening",
+                candidate_json={
+                    "name": "Roadside oyster bar",
+                    "item_type": "restaurant",
+                    "price": 42,
+                    "currency": "USD",
+                    "time_slot": "evening",
+                    "start_time": "18:00",
+                    "book_ref": "mock-oyster-1800",
+                },
+                status="declined",
+                proposal_ref=passed,
+                is_primary=False,
+                approval_deadline=deadline,
+                last_error="The group picked a different table.",
+            ),
+        ]
+    )
+    dinner = Booking(
+        trip_id=trip.id,
+        item_type="restaurant",
+        time_slot="evening",
+        candidate_json={
+            "name": "Nepenthe terrace dinner",
+            "item_type": "restaurant",
+            "price": 58,
+            "currency": "USD",
+            "time_slot": "evening",
+            "start_time": "18:30",
+            "book_ref": "mock-nepenthe-1830",
+        },
+        status="confirmed",
+        proposal_ref=booked,
+        is_primary=True,
+        approved_by=PEOPLE["Priya"],
+        approval_deadline=deadline,
+    )
+    db.session.add(dinner)
+    db.session.flush()
+    correlation = "3e1b7943-6567-4965-a32b-5aa93d057d35"
+    instruction_id = str(uuid.uuid4())
+    for event_type, response in (
+        ("card_enrolled", {"clientCorrelationId": correlation, "status": "ACTIVE"}),
+        ("purchase_intent", {"clientCorrelationId": correlation, "instructionId": instruction_id}),
+        ("payment_credentials", {"clientCorrelationId": correlation, "status": "COMPLETED"}),
+        (
+            "transaction_confirmed",
+            {"clientCorrelationId": correlation, "status": "COMPLETED", "signedPayload": "jws-signed-payload"},
+        ),
+        ("confirmed", {"confirmation_ref": "CF-NEPENTHE-4C91", "price": 58, "currency": "USD"}),
+    ):
+        db.session.add(
+            BookingAuditLog(
+                booking_id=dinner.id,
+                event_type=event_type,
+                actor_jid=PEOPLE["Priya"],
+                provider_response=response,
+            )
+        )
 
 
 def main() -> None:

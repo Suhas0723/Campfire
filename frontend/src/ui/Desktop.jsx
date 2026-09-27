@@ -1,8 +1,9 @@
-import { BookIcon, FootprintsIcon, MapIcon, MoonIcon } from './icons.jsx';
+import { BookIcon, FootprintsIcon, MapIcon, MoonIcon, TicketIcon } from './icons.jsx';
 
 const LEFT_ICONS = [
   { id: 'trip', label: 'Desert trip', Icon: MapIcon },
   { id: 'kyoto', label: 'Kyoto spring break', Icon: MapIcon },
+  { id: 'plans', label: 'Plans', Icon: TicketIcon },
   { id: 'nightly', label: 'Nightly recaps', Icon: MoonIcon },
   { id: 'quests', label: 'Side quests', Icon: FootprintsIcon },
 ];

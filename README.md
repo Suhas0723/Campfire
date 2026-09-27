@@ -81,6 +81,12 @@ Capture is stored only between start and end, and only while the trip is on the 
 
 The linked WhatsApp account is the bot. Use a spare number. Baileys is an unofficial WhatsApp Web client.
 
+## Payments
+
+This app is built against Visa Intelligent Commerce's actual API contract. It runs on a mock provider because production token requester ID provisioning requires Visa account manager sign-off outside this hackathon's timeframe. Switching to live Visa payments requires only setting `PAYMENT_PROVIDER=real_vic` and the corresponding credentials — no application code changes.
+
+Checkout enrolls the card, starts a purchase intent, retrieves tokenized credentials, books the activity, then confirms the transaction with Visa. `PAYMENT_PROVIDER` defaults to `mock_vic`. The live switch also needs `ORG_ID`, `API_KEY`, `SHARED_SECRET`, `TOKEN_REQUESTER_ID`, and `RELATIONSHIP_ID`.
+
 ## Current limits
 
 Side-quest detection, end-of-trip next-trip suggestions, and anniversary posts are not generated yet. The anniversary job only logs trips that are due. Place pins on a generated story use coordinates from the model. Nightly Muse tips need `MUSE_API_KEY` (Meta Model API); without it the day recap still posts.

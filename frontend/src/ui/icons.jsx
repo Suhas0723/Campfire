@@ -135,6 +135,19 @@ export function BookIcon(p) {
   );
 }
 
+export function TicketIcon(p) {
+  return (
+    <Icon {...p}>
+      <Shadow />
+      <path d="M10,18 H54 V28 A6,6 0 0 0 54,40 V48 H10 V40 A6,6 0 0 0 10,28 Z" style={{ ...OUT, fill: c('parchment') }} {...sw()} />
+      <path d="M22,18 V48" style={{ stroke: c('wood'), strokeDasharray: '3 4' }} strokeWidth={2} />
+      <path d="M30,28 C34,28 36,32 34,36 C32,40 36,42 38,38" style={{ fill: 'none', stroke: c('fire-orange'), strokeLinecap: 'round' }} strokeWidth={2.4} />
+      <circle cx="40" cy="30" r="2" style={{ fill: c('fire-yellow') }} />
+      <path d="M28,42 H46" style={{ stroke: c('bark'), strokeLinecap: 'round' }} strokeWidth={2} />
+    </Icon>
+  );
+}
+
 export function CloseIcon({ size = 12 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 12 12" aria-hidden="true">

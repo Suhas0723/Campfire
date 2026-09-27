@@ -1,13 +1,22 @@
-"""Payment provider boundary modeled after Visa Intelligent Commerce."""
+"""Visa Intelligent Commerce payment boundary.
+
+This app is built against Visa Intelligent Commerce's actual API contract. It runs
+on a mock provider because production token requester ID provisioning requires Visa
+account manager sign-off outside this hackathon's timeframe. Switching to live Visa
+payments requires only setting PAYMENT_PROVIDER=real_vic and the corresponding
+credentials — no application code changes.
+"""
 
 import base64
 import hashlib
 import hmac
 import json
 import logging
+import threading
+import time
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import formatdate
 from urllib.parse import quote
@@ -17,79 +26,447 @@ from flask import current_app
 
 logger = logging.getLogger(__name__)
 
-AUTHORIZED_STATUSES = {"AUTHORIZED", "AUTHORIZED_PENDING_REVIEW", "PARTIAL_AUTHORIZED"}
+VIC_TEST_HOST = "apitest.visaacceptance.com"
+VIC_CREDENTIALS = (
+    "ORG_ID",
+    "API_KEY",
+    "SHARED_SECRET",
+    "TOKEN_REQUESTER_ID",
+    "RELATIONSHIP_ID",
+)
+_CONFIG_FOR_ENV = {
+    "ORG_ID": "VIC_ORG_ID",
+    "API_KEY": "VIC_API_KEY",
+    "SHARED_SECRET": "VIC_SHARED_SECRET",
+    "TOKEN_REQUESTER_ID": "VIC_TOKEN_REQUESTER_ID",
+    "RELATIONSHIP_ID": "VIC_RELATIONSHIP_ID",
+}
+
+# Seeded demo instruments. tokenized_card is a 32-char hex network token, the
+# same shape as tokenizedCard.number / VISA_ACCEPTANCE_TOKENIZED_CARD, not a PAN.
+DEMO_PROFILES = {
+    "vic-demo-priya": {
+        "first_name": "Priya",
+        "last_name": "Shah",
+        "email": "priya.shah@example.com",
+        "phone_number": "5550100001",
+        "country": "US",
+        "balance": "1840.55",
+        "currency": "USD",
+        "masked": {"suffix": "1881", "expirationMonth": "08", "expirationYear": "2028", "type": "001"},
+    },
+    "vic-demo-dev": {
+        "first_name": "Dev",
+        "last_name": "Patel",
+        "email": "dev.patel@example.com",
+        "phone_number": "5550100002",
+        "country": "US",
+        "balance": "960.40",
+        "currency": "USD",
+        "masked": {"suffix": "4417", "expirationMonth": "03", "expirationYear": "2027", "type": "001"},
+    },
+    "vic-demo-marcus": {
+        "first_name": "Marcus",
+        "last_name": "Bennett",
+        "email": "marcus.bennett@example.com",
+        "phone_number": "5550100003",
+        "country": "US",
+        "balance": "3125.10",
+        "currency": "USD",
+        "masked": {"suffix": "9026", "expirationMonth": "11", "expirationYear": "2029", "type": "001"},
+    },
+}
 
 
-@dataclass(frozen=True)
-class UserInstruction:
-    idempotency_key: str
-    item: str
-    book_ref: str
-    amount: float
-    max_price: float
-    currency: str
-    approval_message_id: str
+class NotConfiguredError(RuntimeError):
+    def __init__(self, missing: list[str]):
+        self.missing = list(missing)
+        super().__init__(
+            "Visa Intelligent Commerce is not configured. Missing: "
+            + ", ".join(self.missing)
+            + ". Set PAYMENT_PROVIDER=mock_vic, or provide ORG_ID, API_KEY, "
+            "SHARED_SECRET, TOKEN_REQUESTER_ID, and RELATIONSHIP_ID."
+        )
+
+
+class PaymentDeclinedError(RuntimeError):
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+class PaymentProviderError(RuntimeError):
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+@dataclass
+class EnrollmentResult:
+    status: str
+    instrument_id: str
+    pending_events: list[str]
+    client_correlation_id: str
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        """Enroll-a-card response. ACTIVE omits pendingEvents, matching Visa's sample."""
+        body = {
+            "clientCorrelationId": self.client_correlation_id,
+            "status": self.status,
+        }
+        if self.status == "PENDING":
+            body["pendingEvents"] = list(self.pending_events)
+        return body
 
 
-@dataclass(frozen=True)
-class AuthorizationResult:
-    approved: bool
-    authorization_ref: str | None
-    amount: float
-    currency: str
-    reason: str | None = None
+@dataclass
+class PurchaseIntentResult:
+    instruction_id: str
+    status: str
+    client_correlation_id: str
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return {
+            "clientCorrelationId": self.client_correlation_id,
+            "instructionId": self.instruction_id,
+        }
+
+
+@dataclass
+class PaymentCredentials:
+    token_ref: str
+    masked_card_info: dict
+    client_correlation_id: str
+    transaction_id: str
+    status: str = "COMPLETED"
+
+    def to_dict(self) -> dict:
+        masked = self.masked_card_info or {}
+        return {
+            "clientCorrelationId": self.client_correlation_id,
+            "transactionId": self.transaction_id,
+            "status": self.status,
+            "tokenizedCard": {
+                "number": self.token_ref,
+                "expirationMonth": str(masked.get("expirationMonth") or ""),
+                "expirationYear": str(masked.get("expirationYear") or ""),
+                "type": str(masked.get("type") or "001"),
+            },
+        }
+
+
+@dataclass
+class ConfirmationResult:
+    status: str
+    client_correlation_id: str
+    transaction_id: str
+    signed_payload: str
+
+    def to_dict(self) -> dict:
+        return {
+            "clientCorrelationId": self.client_correlation_id,
+            "transactionId": self.transaction_id,
+            "status": self.status,
+            "signedPayload": self.signed_payload,
+        }
 
 
 class PaymentProvider(ABC):
+    name: str
+
     @abstractmethod
-    def authorize(self, *, token_ref: str, instruction: UserInstruction) -> AuthorizationResult:
+    def enroll_card(self, customer_id, billing_info, device_info) -> EnrollmentResult:
         raise NotImplementedError
 
     @abstractmethod
-    def void(self, *, token_ref: str, authorization_ref: str) -> dict:
-        """Release an authorization when downstream booking cannot complete."""
+    def initiate_purchase_intent(self, instrument_id, purchase_details) -> PurchaseIntentResult:
+        raise NotImplementedError
+
+    @abstractmethod
+    def retrieve_payment_credentials(self, instruction_id) -> PaymentCredentials:
+        raise NotImplementedError
+
+    @abstractmethod
+    def confirm_transaction(self, instruction_id, outcome) -> ConfirmationResult:
         raise NotImplementedError
 
 
-class MockVisaIntelligentCommerceProvider(PaymentProvider):
-    """Deterministic stand-in for a token-scoped VIC authorization."""
+class MockVICProvider(PaymentProvider):
+    """In-memory stand-in whose responses use Visa's Intelligent Commerce field names."""
 
-    def authorize(self, *, token_ref: str, instruction: UserInstruction) -> AuthorizationResult:
-        if instruction.amount > instruction.max_price:
-            return AuthorizationResult(
-                approved=False,
-                authorization_ref=None,
-                amount=instruction.amount,
-                currency=instruction.currency,
-                reason="amount_exceeds_user_instruction",
+    name = "mock_vic"
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._enrollments: dict[str, dict] = {}
+        self._intents: dict[str, dict] = {}
+
+    def enroll_card(self, customer_id, billing_info, device_info) -> EnrollmentResult:
+        instrument_id = instrument_id_from_billing(billing_info) or _generated_instrument(str(customer_id))
+        correlation = _correlation(f"enroll:{customer_id}:{instrument_id}")
+        delay = float(current_app.config.get("MOCK_VIC_ENROLL_DELAY_SECONDS", 0) or 0)
+        now = time.monotonic()
+        with self._lock:
+            state = self._enrollments.get(instrument_id)
+            if state is None:
+                state = {"started": now}
+                self._enrollments[instrument_id] = state
+            pending = delay > 0 and (now - float(state["started"])) < delay
+        if pending:
+            logger.info("VIC mock enrollment %s status=PENDING", instrument_id)
+            return EnrollmentResult(
+                status="PENDING",
+                instrument_id=instrument_id,
+                pending_events=["PENDING_CARDHOLDER_AUTHENTICATION"],
+                client_correlation_id=correlation,
             )
+        logger.info("VIC mock enrollment %s status=ACTIVE", instrument_id)
+        return EnrollmentResult(
+            status="ACTIVE",
+            instrument_id=instrument_id,
+            pending_events=[],
+            client_correlation_id=correlation,
+        )
+
+    def initiate_purchase_intent(self, instrument_id, purchase_details) -> PurchaseIntentResult:
+        details = dict(purchase_details or {})
+        amount = _as_amount(details.get("amount"))
+        max_price = _as_amount(details.get("max_price", amount))
+        if amount > max_price:
+            raise PaymentDeclinedError("amount_exceeds_user_instruction")
+        profile = _profile(instrument_id)
+        if amount > _as_amount(profile["balance"]):
+            raise PaymentDeclinedError("insufficient_funds")
         if current_app.config.get("MOCK_VIC_DECLINE"):
-            return AuthorizationResult(
-                approved=False,
-                authorization_ref=None,
-                amount=instruction.amount,
-                currency=instruction.currency,
-                reason="mock_authorization_declined",
-            )
-        reference = uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            f"{token_ref}:{instruction.idempotency_key}",
-        )
-        return AuthorizationResult(
-            approved=True,
-            authorization_ref=f"VIC-MOCK-{str(reference).upper()}",
-            amount=instruction.amount,
-            currency=instruction.currency,
+            raise PaymentDeclinedError("mock_authorization_declined")
+        instruction_id = str(uuid.uuid4())
+        correlation = _correlation(f"intent:{instruction_id}")
+        with self._lock:
+            self._intents[instruction_id] = {
+                "instrument_id": str(instrument_id),
+                "purchase_details": details,
+                "token_ref": _tokenized_card_number(str(instrument_id)),
+                "masked": dict(profile["masked"]),
+                "status": "ACTIVE",
+                "client_correlation_id": correlation,
+            }
+        return PurchaseIntentResult(
+            instruction_id=instruction_id,
+            status="ACTIVE",
+            client_correlation_id=correlation,
         )
 
-    def void(self, *, token_ref: str, authorization_ref: str) -> dict:
-        return {"voided": True, "authorization_ref": authorization_ref}
+    def retrieve_payment_credentials(self, instruction_id) -> PaymentCredentials:
+        with self._lock:
+            intent = self._intents.get(str(instruction_id))
+        if intent is None:
+            raise PaymentProviderError("unknown_instruction_id")
+        correlation = _correlation(f"credentials:{instruction_id}")
+        return PaymentCredentials(
+            token_ref=intent["token_ref"],
+            masked_card_info=dict(intent["masked"]),
+            client_correlation_id=correlation,
+            transaction_id=str(uuid.uuid4()),
+            status="COMPLETED",
+        )
+
+    def confirm_transaction(self, instruction_id, outcome) -> ConfirmationResult:
+        with self._lock:
+            intent = self._intents.get(str(instruction_id))
+            if intent is None:
+                raise PaymentProviderError("unknown_instruction_id")
+            intent["status"] = "COMPLETED"
+            intent["outcome"] = dict(outcome or {})
+        correlation = _correlation(f"confirm:{instruction_id}")
+        logger.info(
+            "VIC mock transaction confirmed instruction_id=%s status=COMPLETED outcome=%s",
+            instruction_id,
+            (outcome or {}).get("type") or "PURCHASE",
+        )
+        return ConfirmationResult(
+            status="COMPLETED",
+            client_correlation_id=correlation,
+            transaction_id=str(uuid.uuid4()),
+            signed_payload="jws-signed-payload",
+        )
+
+
+class RealVICProvider(PaymentProvider):
+    """Live Intelligent Commerce calls against the Visa Acceptance test host.
+
+    Structurally complete. Requests follow the published enroll, purchase-intent,
+    credentials, and confirmation contracts. Construction raises NotConfiguredError
+    until ORG_ID, API_KEY, SHARED_SECRET, TOKEN_REQUESTER_ID, and RELATIONSHIP_ID
+    are set.
+    """
+
+    name = "real_vic"
+
+    def __init__(self, transport=None):
+        missing = missing_vic_config()
+        if missing:
+            raise NotConfiguredError(missing)
+        self._transport = transport
+        self._intents: dict[str, dict] = {}
+
+    def enroll_card(self, customer_id, billing_info, device_info) -> EnrollmentResult:
+        instrument_id = instrument_id_from_billing(billing_info)
+        if not instrument_id:
+            raise PaymentProviderError("missing_instrument_identifier")
+        correlation = str(uuid.uuid4())
+        body = self._request(
+            "POST",
+            "/acp/v1/tokens",
+            _enroll_body(customer_id, billing_info, device_info, instrument_id, correlation),
+        )
+        pending = body.get("pendingEvents") or []
+        if isinstance(pending, str):
+            pending = [pending]
+        return EnrollmentResult(
+            status=str(body.get("status") or ""),
+            instrument_id=instrument_id,
+            pending_events=[str(item) for item in pending],
+            client_correlation_id=str(body.get("clientCorrelationId") or correlation),
+        )
+
+    def initiate_purchase_intent(self, instrument_id, purchase_details) -> PurchaseIntentResult:
+        if not str(instrument_id or "").strip():
+            raise PaymentProviderError("missing_instrument_identifier")
+        correlation = str(uuid.uuid4())
+        payload = _purchase_intent_body(str(instrument_id), purchase_details, correlation)
+        body = self._request("POST", "/acp/v1/instructions", payload)
+        instruction_id = str(body.get("instructionId") or "")
+        if not instruction_id:
+            raise PaymentProviderError("purchase_intent_missing_instruction_id")
+        self._intents[instruction_id] = {
+            "instrument_id": str(instrument_id),
+            "tokenized_card_number": payload["tokenizedCard"]["number"],
+            "purchase_details": dict(purchase_details or {}),
+        }
+        return PurchaseIntentResult(
+            instruction_id=instruction_id,
+            status="ACTIVE",
+            client_correlation_id=str(body.get("clientCorrelationId") or correlation),
+        )
+
+    def retrieve_payment_credentials(self, instruction_id) -> PaymentCredentials:
+        intent = self._intents.get(str(instruction_id))
+        if intent is None:
+            raise PaymentProviderError("unknown_instruction_id")
+        correlation = str(uuid.uuid4())
+        body = self._request(
+            "POST",
+            f"/acp/v1/instructions/{quote(str(instruction_id), safe='')}/credentials",
+            _credentials_body(intent, correlation),
+        )
+        status = str(body.get("status") or "")
+        if status not in {"COMPLETED", "SUCCESS"}:
+            raise PaymentProviderError(f"payment_credentials_{status.casefold() or 'missing'}")
+        card = _tokenized_card(body)
+        if card is None or not card.get("number"):
+            raise PaymentProviderError("payment_credentials_missing")
+        masked = {
+            "type": str(card.get("type") or "001"),
+            "expirationMonth": str(card.get("expirationMonth") or ""),
+            "expirationYear": str(card.get("expirationYear") or ""),
+        }
+        if card.get("suffix"):
+            masked["suffix"] = str(card["suffix"])
+        return PaymentCredentials(
+            token_ref=str(card["number"]),
+            masked_card_info=masked,
+            client_correlation_id=str(body.get("clientCorrelationId") or correlation),
+            transaction_id=str(body.get("transactionId") or ""),
+            status=status,
+        )
+
+    def confirm_transaction(self, instruction_id, outcome) -> ConfirmationResult:
+        if not str(instruction_id or "").strip():
+            raise PaymentProviderError("unknown_instruction_id")
+        correlation = str(uuid.uuid4())
+        body = self._request(
+            "POST",
+            f"/acp/v1/instructions/{quote(str(instruction_id), safe='')}/confirmations",
+            _confirmation_body(outcome, correlation),
+        )
+        status = str(body.get("status") or "")
+        logger.info(
+            "VIC transaction confirmation instruction_id=%s status=%s",
+            instruction_id,
+            status,
+        )
+        return ConfirmationResult(
+            status=status,
+            client_correlation_id=str(body.get("clientCorrelationId") or correlation),
+            transaction_id=str(body.get("transactionId") or ""),
+            signed_payload=str(body.get("signedPayload") or ""),
+        )
+
+    def _request(self, method: str, path: str, payload: dict) -> dict:
+        if self._transport is not None:
+            body = self._transport(method, path, payload)
+            if not isinstance(body, dict):
+                raise PaymentProviderError("visa_acceptance_invalid_response")
+            return body
+        config = current_app.config
+        host = VIC_TEST_HOST
+        raw = json.dumps(payload, separators=(",", ":")).encode()
+        date = formatdate(timeval=None, localtime=False, usegmt=True)
+        headers = http_signature_headers(
+            method=method,
+            host=host,
+            path=path,
+            body=raw,
+            merchant_id=str(config["VIC_ORG_ID"]).strip(),
+            key_id=str(config["VIC_API_KEY"]).strip(),
+            shared_secret=str(config["VIC_SHARED_SECRET"]).strip(),
+            date=date,
+        )
+        headers["token-requestor-id"] = str(config["VIC_TOKEN_REQUESTER_ID"]).strip()
+        headers["relationship-id"] = str(config["VIC_RELATIONSHIP_ID"]).strip()
+        try:
+            response = requests.request(
+                method,
+                f"https://{host}{path}",
+                data=raw,
+                headers=headers,
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise PaymentProviderError("visa_acceptance_unreachable") from exc
+        if response.status_code >= 400:
+            raise PaymentProviderError(_error_reason(response))
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise PaymentProviderError("visa_acceptance_invalid_response") from exc
+        if not isinstance(body, dict):
+            raise PaymentProviderError("visa_acceptance_invalid_response")
+        return body
+
+
+def get_payment_provider() -> PaymentProvider:
+    """Single switch between the mock and live Intelligent Commerce providers."""
+    name = str(current_app.config.get("PAYMENT_PROVIDER", "mock_vic")).strip().casefold()
+    if name == "mock_vic":
+        return MockVICProvider()
+    if name == "real_vic":
+        return RealVICProvider()
+    raise RuntimeError(f"Unsupported payment provider: {name}. Expected mock_vic or real_vic.")
+
+
+def missing_vic_config() -> list[str]:
+    return [name for name in VIC_CREDENTIALS if not str(current_app.config.get(_CONFIG_FOR_ENV[name]) or "").strip()]
+
+
+def instrument_id_from_billing(billing_info) -> str:
+    billing = billing_info or {}
+    payment = billing.get("paymentInformation") if isinstance(billing, dict) else None
+    payment = payment or {}
+    identifier = payment.get("instrumentIdentifier") or billing.get("instrumentIdentifier") or {}
+    if not isinstance(identifier, dict):
+        identifier = {}
+    return str(identifier.get("id") or billing.get("instrument_id") or "").strip()
 
 
 def http_signature_headers(
@@ -139,335 +516,216 @@ def signature_for_signing_string(signing: str, shared_secret: str) -> str:
     return base64.b64encode(hmac.new(key, signing.encode(), hashlib.sha256).digest()).decode()
 
 
-def authorization_reference(*, payment_id: str, instruction_id: str) -> str:
-    return f"payment:{payment_id}|instruction:{instruction_id}"
+def _profile(instrument_id: str) -> dict:
+    known = DEMO_PROFILES.get(str(instrument_id))
+    if known is not None:
+        return known
+    return {
+        "first_name": "Campfire",
+        "last_name": "Traveler",
+        "email": "traveler@example.com",
+        "phone_number": "5550100000",
+        "country": "US",
+        "balance": "500.00",
+        "currency": "USD",
+        "masked": {"suffix": "4242", "expirationMonth": "12", "expirationYear": "2028", "type": "001"},
+    }
 
 
-def parse_authorization_reference(authorization_ref: str) -> tuple[str | None, str | None]:
-    payment_id = None
-    instruction_id = None
-    for part in str(authorization_ref or "").split("|"):
-        if part.startswith("payment:"):
-            payment_id = part.removeprefix("payment:") or None
-        elif part.startswith("instruction:"):
-            instruction_id = part.removeprefix("instruction:") or None
-    return payment_id, instruction_id
+def _tokenized_card_number(instrument_id: str) -> str:
+    digest = hashlib.sha256(f"visa-acceptance-tokenized-card:{instrument_id}".encode()).hexdigest()
+    token = digest[:32]
+    if token.isdigit():
+        token = token[:-1] + "a"
+    return token
 
 
-class VisaAcceptanceError(RuntimeError):
-    def __init__(self, reason: str, authorization_ref: str | None = None):
-        self.reason = reason
-        self.authorization_ref = authorization_ref
-        message = reason
-        if authorization_ref:
-            message = f"{reason}; authorization_void_pending:{authorization_ref}"
-        super().__init__(message)
-
-
-class VisaAcceptanceProvider(PaymentProvider):
-    """Sandbox Visa Acceptance purchase intent, credential retrieval, and auth-only hold."""
-
-    def __init__(self, transport=None):
-        self._transport = transport
-
-    def authorize(self, *, token_ref: str, instruction: UserInstruction) -> AuthorizationResult:
-        if instruction.amount > instruction.max_price:
-            return _declined(instruction, "amount_exceeds_user_instruction")
-        missing = _missing_visa_config()
-        if missing:
-            return _declined(instruction, f"visa_acceptance_not_configured:{','.join(missing)}")
-        if not str(token_ref or "").strip():
-            return _declined(instruction, "missing_instrument_identifier")
-
-        instruction_id = None
-        payment_id = None
-        try:
-            created = self._request(
-                "POST",
-                "/acp/v1/instructions",
-                _purchase_intent_body(token_ref, instruction),
-            )
-            instruction_id = str(created.get("instructionId") or "") or None
-            if not instruction_id:
-                return _declined(instruction, "purchase_intent_missing_instruction_id")
-            credentials = self._request(
-                "POST",
-                f"/acp/v1/instructions/{quote(instruction_id, safe='')}/credentials",
-                _credentials_body(token_ref, instruction),
-            )
-            status = str(credentials.get("status") or "COMPLETED")
-            if status not in {"COMPLETED", "SUCCESS"}:
-                raise VisaAcceptanceError(f"payment_credentials_{status.casefold()}")
-            card = _card_from_credentials(credentials)
-            if card is None:
-                raise VisaAcceptanceError("payment_credentials_missing")
-            payment = self._request("POST", "/pts/v2/payments", _auth_body(instruction, card))
-            payment_id = str(payment.get("id") or "") or None
-            payment_status = str(payment.get("status") or "")
-            if payment_status not in AUTHORIZED_STATUSES or not payment_id:
-                raise VisaAcceptanceError(f"payment_{payment_status.casefold() or 'declined'}")
-            return AuthorizationResult(
-                approved=True,
-                authorization_ref=authorization_reference(payment_id=payment_id, instruction_id=instruction_id),
-                amount=instruction.amount,
-                currency=instruction.currency,
-            )
-        except VisaAcceptanceError as exc:
-            if not instruction_id and not payment_id:
-                return _declined(instruction, exc.reason)
-            reference = authorization_reference(payment_id=payment_id or "", instruction_id=instruction_id or "")
-            try:
-                self._release(payment_id, instruction_id)
-            except VisaAcceptanceError as release_error:
-                raise VisaAcceptanceError(release_error.reason, reference) from exc
-            return _declined(instruction, exc.reason)
-
-    def void(self, *, token_ref: str, authorization_ref: str) -> dict:
-        payment_id, instruction_id = parse_authorization_reference(authorization_ref)
-        if not payment_id and not instruction_id:
-            return {"voided": False, "authorization_ref": authorization_ref}
-        self._release(payment_id, instruction_id)
-        return {"voided": True, "authorization_ref": authorization_ref}
-
-    def _release(self, payment_id: str | None, instruction_id: str | None) -> None:
-        if payment_id:
-            reversal = self._request(
-                "POST",
-                f"/pts/v2/payments/{quote(payment_id, safe='')}/reversals",
-                {"clientReferenceInformation": {"code": _correlation(f"void:{payment_id}")[:25]}},
-            )
-            status = str(reversal.get("status") or "")
-            if status not in {"REVERSED", "VOIDED"}:
-                raise VisaAcceptanceError(f"reversal_{status.casefold() or 'failed'}")
-        if instruction_id:
-            self._request(
-                "PUT",
-                f"/acp/v1/instructions/{quote(instruction_id, safe='')}",
-                _cancel_intent_body(instruction_id),
-            )
-
-    def _request(self, method: str, path: str, payload: dict) -> dict:
-        if self._transport is not None:
-            body = self._transport(method, path, payload)
-            if not isinstance(body, dict):
-                raise VisaAcceptanceError("visa_acceptance_invalid_response")
-            return body
-        config = current_app.config
-        host = str(config["VISA_ACCEPTANCE_HOST"]).strip()
-        raw = json.dumps(payload, separators=(",", ":")).encode()
-        date = formatdate(timeval=None, localtime=False, usegmt=True)
-        headers = http_signature_headers(
-            method=method,
-            host=host,
-            path=path,
-            body=raw,
-            merchant_id=str(config["VISA_ACCEPTANCE_MERCHANT_ID"]).strip(),
-            key_id=str(config["VISA_ACCEPTANCE_KEY_ID"]).strip(),
-            shared_secret=str(config["VISA_ACCEPTANCE_SHARED_SECRET"]).strip(),
-            date=date,
-        )
-        try:
-            response = requests.request(
-                method,
-                f"https://{host}{path}",
-                data=raw,
-                headers=headers,
-                timeout=30,
-            )
-        except requests.RequestException as exc:
-            raise VisaAcceptanceError("visa_acceptance_unreachable") from exc
-        if response.status_code >= 400:
-            raise VisaAcceptanceError(_error_reason(response))
-        try:
-            body = response.json()
-        except ValueError as exc:
-            raise VisaAcceptanceError("visa_acceptance_invalid_response") from exc
-        if not isinstance(body, dict):
-            raise VisaAcceptanceError("visa_acceptance_invalid_response")
-        return body
-
-
-def get_payment_provider() -> PaymentProvider:
-    name = str(current_app.config.get("PAYMENT_PROVIDER", "mock_vic")).casefold()
-    if name == "mock_vic":
-        return MockVisaIntelligentCommerceProvider()
-    if name == "visa_acceptance":
-        return VisaAcceptanceProvider()
-    raise RuntimeError(f"Unsupported payment provider: {name}")
-
-
-def _declined(instruction: UserInstruction, reason: str) -> AuthorizationResult:
-    return AuthorizationResult(
-        approved=False,
-        authorization_ref=None,
-        amount=instruction.amount,
-        currency=instruction.currency,
-        reason=reason,
-    )
-
-
-def _missing_visa_config() -> list[str]:
-    required = (
-        "VISA_ACCEPTANCE_MERCHANT_ID",
-        "VISA_ACCEPTANCE_KEY_ID",
-        "VISA_ACCEPTANCE_SHARED_SECRET",
-        "VISA_ACCEPTANCE_HOST",
-        "VISA_ACCEPTANCE_TOKENIZED_CARD",
-    )
-    return [name for name in required if not str(current_app.config.get(name) or "").strip()]
+def _generated_instrument(customer_id: str) -> str:
+    return hashlib.sha256(f"vic-instrument:{customer_id}".encode()).hexdigest()[:32].upper()
 
 
 def _correlation(value: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, value))
 
 
-def _purchase_intent_body(token_ref: str, instruction: UserInstruction) -> dict:
-    correlation = _correlation(instruction.idempotency_key)
-    until = datetime.now(timezone.utc) + timedelta(days=1)
+def _as_amount(value) -> float:
+    if value is None or value == "":
+        return 0.0
+    return float(value)
+
+
+def _device_information(device_info, correlation: str, country: str) -> dict:
+    device = device_info or {}
+    device_data = device.get("deviceData") or {}
     return {
-        "clientCorrelationId": correlation,
-        "paymentInformation": {
-            "customer": {"id": ""},
-            "paymentInstrument": {"id": ""},
-            "instrumentIdentifier": {"id": token_ref},
+        "userAgent": device.get("userAgent") or "Campfire",
+        "applicationName": device.get("applicationName") or "Campfire",
+        "fingerprintSessionId": device.get("fingerprintSessionId") or correlation,
+        "country": device.get("country") or country or "US",
+        "deviceData": {
+            "type": device_data.get("type") or "Mobile",
+            "manufacturer": device_data.get("manufacturer") or "Campfire",
+            "brand": device_data.get("brand") or "Campfire",
+            "model": device_data.get("model") or "Web",
         },
-        "deviceInformation": _device_information(correlation),
-        "tokenizedCard": {"number": str(current_app.config["VISA_ACCEPTANCE_TOKENIZED_CARD"]).strip()},
-        "assuranceData": [_assurance_data(correlation)],
-        "mandates": [
-            {
-                "mandateId": correlation,
-                "declineThreshold": {
-                    "amount": f"{instruction.max_price:.2f}",
-                    "currencyCode": instruction.currency,
-                },
-                "effectiveUntilTime": str(int(until.timestamp())),
-                "description": instruction.item[:255],
-            }
-        ],
-        "consumerPrompt": f"Authorize {instruction.currency} {instruction.amount:.2f} for {instruction.item}"[:255],
-    }
-
-
-def _credentials_body(token_ref: str, instruction: UserInstruction) -> dict:
-    correlation = _correlation(f"credentials:{instruction.idempotency_key}")
-    merchant_url = str(current_app.config.get("PUBLIC_APP_URL") or "https://example.com")
-    return {
-        "clientCorrelationId": correlation,
-        "paymentInformation": {"instrumentIdentifier": {"id": token_ref}},
-        "tokenizedCard": {"number": str(current_app.config["VISA_ACCEPTANCE_TOKENIZED_CARD"]).strip()},
-        "transactionData": [
-            {
-                "clientReferenceInformation": {"code": correlation.replace("-", "")[:25]},
-                "transactionType": "PURCHASE",
-                "orderInformation": {
-                    "amountDetail": {
-                        "totalAmount": f"{instruction.amount:.2f}",
-                        "currency": instruction.currency,
-                    }
-                },
-                "merchantInformation": {
-                    "merchantName": "Campfire",
-                    "merchantDescriptor": {"country": "US", "url": merchant_url},
-                },
-                "products": [
-                    {
-                        "productName": instruction.item[:255],
-                        "quantity": "1",
-                        "unitPrice": {"currency": instruction.currency, "amount": f"{instruction.amount:.2f}"},
-                    }
-                ],
-            }
-        ],
-    }
-
-
-def _auth_body(instruction: UserInstruction, card: dict) -> dict:
-    tokenized = {
-        "number": card["number"],
-        "expirationMonth": card["expirationMonth"],
-        "expirationYear": card["expirationYear"],
-    }
-    if card.get("cryptogram"):
-        tokenized["cryptogram"] = card["cryptogram"]
-        tokenized["transactionType"] = "1"
-    return {
-        "clientReferenceInformation": {"code": _correlation(instruction.idempotency_key).replace("-", "")[:25]},
-        "processingInformation": {"capture": False, "commerceIndicator": "internet"},
-        "paymentInformation": {"tokenizedCard": tokenized},
-        "orderInformation": {
-            "amountDetails": {
-                "totalAmount": f"{instruction.amount:.2f}",
-                "currency": instruction.currency,
-            },
-            "billTo": {
-                "firstName": "Campfire",
-                "lastName": "Traveler",
-                "address1": "1 Market St",
-                "locality": "San Francisco",
-                "administrativeArea": "CA",
-                "postalCode": "94105",
-                "country": "US",
-                "email": "traveler@example.com",
-            },
-        },
-    }
-
-
-def _cancel_intent_body(instruction_id: str) -> dict:
-    correlation = _correlation(f"cancel:{instruction_id}")
-    return {
-        "clientCorrelationId": correlation,
-        "deviceInformation": _device_information(correlation),
-        "assuranceData": [_assurance_data(correlation)],
-    }
-
-
-def _device_information(correlation: str) -> dict:
-    return {
-        "applicationName": "Campfire",
-        "fingerprintSessionId": correlation,
-        "deviceData": {"type": "Mobile", "brand": "Campfire"},
-        "ipAddress": "127.0.0.1",
+        "ipAddress": device.get("ipAddress") or "127.0.0.1",
+        "clientDeviceId": device.get("clientDeviceId") or correlation.replace("-", ""),
     }
 
 
 def _assurance_data(correlation: str) -> dict:
     return {
         "verificationType": "DEVICE",
+        "verificationEntity": "10",
+        "verificationEvents": ["01"],
         "verificationMethod": "02",
         "verificationResults": "01",
         "verificationTimestamp": str(int(datetime.now(timezone.utc).timestamp())),
-        "authenticatedIdentities": {"id": correlation, "provider": "VISA_PAYMENT_PASSKEY"},
+        "authenticationContext": {"action": "AUTHENTICATE"},
+        "authenticatedIdentities": {
+            "data": correlation,
+            "provider": "VISA_PAYMENT_PASSKEY",
+            "id": correlation,
+        },
+        "additionalData": "",
     }
 
 
-def _card_from_credentials(payload: dict) -> dict | None:
+def _enroll_body(customer_id, billing_info, device_info, instrument_id: str, correlation: str) -> dict:
+    billing = dict(billing_info or {})
+    country = billing.get("country") or "US"
+    email = billing.get("email") or "traveler@example.com"
+    return {
+        "clientCorrelationId": correlation,
+        "deviceInformation": _device_information(device_info, correlation, country),
+        "buyerInformation": {
+            "merchantCustomerId": str(customer_id),
+            "language": billing.get("language") or "en",
+        },
+        "billTo": {
+            "firstName": billing.get("firstName") or "Campfire",
+            "lastName": billing.get("lastName") or "Traveler",
+            "email": email,
+            "countryCallingCode": str(billing.get("countryCallingCode") or "1"),
+            "phoneNumber": str(billing.get("phoneNumber") or "5550100000"),
+            "numberIsVoiceOnly": False,
+            "country": country,
+        },
+        "consumerIdentity": {
+            "identityType": "EMAIL_ADDRESS",
+            "identityValue": email,
+            "identityProvider": "PARTNER",
+            "identityProviderUrl": billing.get("identityProviderUrl") or "https://example.com",
+        },
+        "paymentInformation": {
+            "customer": {"id": ""},
+            "paymentInstrument": {"id": ""},
+            "instrumentIdentifier": {"id": instrument_id},
+        },
+    }
+
+
+def _purchase_intent_body(instrument_id: str, purchase_details, correlation: str) -> dict:
+    details = dict(purchase_details or {})
+    amount = _as_amount(details.get("max_price", details.get("amount")))
+    currency = str(details.get("currency") or "USD")
+    until = datetime.now(timezone.utc) + timedelta(days=1)
+    token_number = str(details.get("tokenized_card_number") or instrument_id).strip()
+    description = str(details.get("item") or details.get("description") or "Campfire booking")[:255]
+    return {
+        "clientCorrelationId": correlation,
+        "paymentInformation": {
+            "customer": {"id": ""},
+            "paymentInstrument": {"id": ""},
+            "instrumentIdentifier": {"id": instrument_id},
+        },
+        "deviceInformation": _device_information(details.get("deviceInformation"), correlation, "US"),
+        "tokenizedCard": {"number": token_number},
+        "assuranceData": [_assurance_data(correlation)],
+        "mandates": [
+            {
+                "mandateId": correlation,
+                "declineThreshold": {"amount": f"{amount:.2f}", "currencyCode": currency},
+                "effectiveUntilTime": str(int(until.timestamp())),
+                "description": description,
+            }
+        ],
+        "buyerInformation": {"merchantCustomerId": str(details.get("customer_id") or "")},
+        "consumerPrompt": f"Authorize {currency} {_as_amount(details.get('amount')):.2f} for {description}"[:255],
+    }
+
+
+def _credentials_body(intent: dict, correlation: str) -> dict:
+    details = dict(intent.get("purchase_details") or {})
+    return {
+        "clientCorrelationId": correlation,
+        "paymentInformation": {"instrumentIdentifier": {"id": intent["instrument_id"]}},
+        "tokenizedCard": {"number": intent["tokenized_card_number"]},
+        "transactionData": [
+            _transaction_data(
+                correlation,
+                {
+                    "totalAmount": details.get("amount") or "0.00",
+                    "currency": details.get("currency") or "USD",
+                    "merchantName": details.get("merchantName") or "Campfire",
+                    "merchantUrl": details.get("merchantUrl") or "https://example.com",
+                    "merchantCountry": details.get("merchantCountry") or "US",
+                    "code": details.get("code"),
+                    "type": "PURCHASE",
+                },
+            )
+        ],
+    }
+
+
+def _confirmation_body(outcome, correlation: str) -> dict:
+    return {
+        "clientCorrelationId": correlation,
+        "transactionData": [_transaction_data(correlation, outcome or {})],
+    }
+
+
+def _transaction_data(correlation: str, outcome: dict) -> dict:
+    currency = str(outcome.get("currency") or "USD")
+    amount = outcome.get("totalAmount") or "0.00"
+    merchant_url = str(outcome.get("merchantUrl") or "https://example.com")
+    code = str(outcome.get("code") or correlation.replace("-", ""))[:25]
+    return {
+        "clientReferenceInformation": {"code": code},
+        "type": str(outcome.get("type") or "PURCHASE"),
+        "transactionType": "PURCHASE",
+        "orderInformation": {
+            "amountDetail": {
+                "totalAmount": str(amount),
+                "currency": currency,
+            }
+        },
+        "merchantInformation": {
+            "merchantName": str(outcome.get("merchantName") or "Campfire"),
+            "merchantDescriptor": {
+                "country": str(outcome.get("merchantCountry") or "US"),
+                "url": merchant_url,
+            },
+        },
+    }
+
+
+def _tokenized_card(payload: dict) -> dict | None:
     found = []
     tokenized = payload.get("tokenizedCard")
     if isinstance(tokenized, dict):
         found.append(tokenized)
     payment = payload.get("paymentInformation") or {}
-    if isinstance(payment, dict):
-        if isinstance(payment.get("tokenizedCard"), dict):
-            found.append(payment["tokenizedCard"])
-        if isinstance(payment.get("card"), dict):
-            found.append(payment["card"])
+    if isinstance(payment, dict) and isinstance(payment.get("tokenizedCard"), dict):
+        found.append(payment["tokenizedCard"])
     for item in payload.get("paymentCredentials") or []:
         if isinstance(item, dict):
-            found.append(item.get("tokenizedCard") or item)
+            card = item.get("tokenizedCard") or item
+            if isinstance(card, dict):
+                found.append(card)
     for card in found:
-        number = str(card.get("number") or "")
-        month = str(card.get("expirationMonth") or card.get("expiryMonth") or "")
-        year = str(card.get("expirationYear") or card.get("expiryYear") or "")
-        if number and month and year:
-            cryptogram = card.get("cryptogram") or card.get("dynamicData") or ""
-            return {
-                "number": number,
-                "expirationMonth": month,
-                "expirationYear": year,
-                "cryptogram": str(cryptogram or ""),
-            }
+        if card.get("number"):
+            return card
     return None
 
 

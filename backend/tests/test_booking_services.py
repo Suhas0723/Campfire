@@ -22,9 +22,11 @@ from app.services.activities import (
 )
 from app.services.bookings import _compact_summary, _match_items, _normalize
 from app.services.payments import (
-    MockVisaIntelligentCommerceProvider,
-    UserInstruction,
-    VisaAcceptanceProvider,
+    MockVICProvider,
+    NotConfiguredError,
+    PaymentDeclinedError,
+    RealVICProvider,
+    get_payment_provider,
     http_signature_headers,
     signature_for_signing_string,
 )
@@ -40,7 +42,12 @@ VISA_BASELINE_SIGNATURE = "ViHPF/tRP+jlFkWaUWBB53WQ6ASQ1ox1zbJ7ApVc7Q8="
 class BookingServiceTests(unittest.TestCase):
     def setUp(self):
         self.app = Flask(__name__)
-        self.app.config.update(MOCK_ACTIVITY_REPRICE_DELTA=0, MOCK_VIC_DECLINE=False)
+        self.app.config.update(
+            MOCK_ACTIVITY_REPRICE_DELTA=0,
+            MOCK_VIC_DECLINE=False,
+            MOCK_VIC_ENROLL_DELAY_SECONDS=0,
+            PAYMENT_PROVIDER="mock_vic",
+        )
         self.context = self.app.app_context()
         self.context.push()
 
@@ -69,21 +76,65 @@ class BookingServiceTests(unittest.TestCase):
         self.assertEqual(2, len(_match_items(rows, "activity")))
         self.assertEqual("old town walking tour", _normalize(" Old Town walking tour!!! "))
 
-    def test_mock_payment_honors_instruction_limit_and_decline_switch(self):
-        provider = MockVisaIntelligentCommerceProvider()
-        instruction = UserInstruction(
-            idempotency_key="booking-1",
-            item="Tour",
-            book_ref="mock-tour",
-            amount=22,
-            max_price=22,
-            currency="USD",
-            approval_message_id="wa-1",
+    def test_mock_payment_follows_vic_contract_and_decline_switch(self):
+        provider = MockVICProvider()
+        billing = {
+            "firstName": "Priya",
+            "lastName": "Shah",
+            "email": "priya.shah@example.com",
+            "country": "US",
+            "countryCallingCode": "1",
+            "phoneNumber": "5550100001",
+            "paymentInformation": {"instrumentIdentifier": {"id": "vic-demo-priya"}},
+        }
+        device = {"applicationName": "Campfire", "ipAddress": "127.0.0.1", "deviceData": {"type": "Mobile", "brand": "Campfire"}}
+        purchase = {
+            "amount": "22.00",
+            "max_price": "22.00",
+            "currency": "USD",
+            "item": "Tour",
+            "merchantName": "Campfire",
+            "merchantUrl": "http://localhost:5173",
+        }
+        enrolled = provider.enroll_card("priya", billing, device)
+        self.assertEqual(enrolled.status, "ACTIVE")
+        self.assertEqual(enrolled.instrument_id, "vic-demo-priya")
+        self.assertEqual(
+            enrolled.to_dict(),
+            {"clientCorrelationId": enrolled.client_correlation_id, "status": "ACTIVE"},
         )
-        approved = provider.authorize(token_ref="token", instruction=instruction)
-        self.assertTrue(approved.approved)
+        intent = provider.initiate_purchase_intent(enrolled.instrument_id, purchase)
+        self.assertEqual(intent.status, "ACTIVE")
+        self.assertIn("instructionId", intent.to_dict())
+        credentials = provider.retrieve_payment_credentials(intent.instruction_id)
+        self.assertEqual(len(credentials.token_ref), 32)
+        self.assertTrue(all(char in "0123456789abcdef" for char in credentials.token_ref))
+        self.assertFalse(credentials.token_ref.isdigit())
+        self.assertEqual(credentials.masked_card_info["suffix"], "1881")
+        self.assertEqual(credentials.to_dict()["tokenizedCard"]["number"], credentials.token_ref)
+        self.assertEqual(credentials.to_dict()["status"], "COMPLETED")
+        confirmed = provider.confirm_transaction(intent.instruction_id, {"type": "PURCHASE", "totalAmount": "22.00", "currency": "USD"})
+        self.assertEqual(confirmed.status, "COMPLETED")
+        self.assertEqual(confirmed.to_dict()["status"], "COMPLETED")
+        self.assertEqual(confirmed.to_dict()["signedPayload"], "jws-signed-payload")
+
+        over_limit = dict(purchase, amount="30.00", max_price="22.00")
+        with self.assertRaises(PaymentDeclinedError) as limit_error:
+            provider.initiate_purchase_intent(enrolled.instrument_id, over_limit)
+        self.assertEqual(limit_error.exception.reason, "amount_exceeds_user_instruction")
+
         self.app.config["MOCK_VIC_DECLINE"] = True
-        self.assertFalse(provider.authorize(token_ref="token", instruction=instruction).approved)
+        with self.assertRaises(PaymentDeclinedError) as decline_error:
+            provider.initiate_purchase_intent(enrolled.instrument_id, purchase)
+        self.assertEqual(decline_error.exception.reason, "mock_authorization_declined")
+
+        self.app.config["MOCK_VIC_DECLINE"] = False
+        self.app.config["MOCK_VIC_ENROLL_DELAY_SECONDS"] = 60
+        pending_provider = MockVICProvider()
+        pending = pending_provider.enroll_card("priya", billing, device)
+        self.assertEqual(pending.status, "PENDING")
+        self.assertEqual(pending.to_dict()["pendingEvents"], ["PENDING_CARDHOLDER_AUTHENTICATION"])
+        self.assertIsInstance(get_payment_provider(), MockVICProvider)
 
     def test_approval_summary_is_derived_from_provider_terms(self):
         summary = _compact_summary(
@@ -146,56 +197,101 @@ class BookingServiceTests(unittest.TestCase):
             VISA_BASELINE_SIGNATURE,
         )
 
-    def test_visa_acceptance_authorizes_then_voids_without_network(self):
+    def test_real_vic_requires_credentials_and_follows_four_endpoints(self):
+        with self.assertRaises(NotConfiguredError) as missing:
+            RealVICProvider()
+        self.assertEqual(
+            missing.exception.missing,
+            ["ORG_ID", "API_KEY", "SHARED_SECRET", "TOKEN_REQUESTER_ID", "RELATIONSHIP_ID"],
+        )
         calls = []
 
         def transport(method, path, payload):
             calls.append((method, path, payload))
+            if path == "/acp/v1/tokens":
+                self.assertEqual(payload["paymentInformation"]["instrumentIdentifier"]["id"], "7019989999909760770")
+                self.assertIn("billTo", payload)
+                self.assertIn("buyerInformation", payload)
+                self.assertIn("consumerIdentity", payload)
+                self.assertIn("deviceInformation", payload)
+                return {"clientCorrelationId": payload["clientCorrelationId"], "status": "ACTIVE"}
             if path == "/acp/v1/instructions" and method == "POST":
-                return {"instructionId": "ins-1"}
+                self.assertEqual(payload["paymentInformation"]["instrumentIdentifier"]["id"], "7019989999909760770")
+                self.assertEqual(payload["tokenizedCard"]["number"], "7019989999909760770")
+                self.assertIn("mandates", payload)
+                return {"clientCorrelationId": payload["clientCorrelationId"], "instructionId": "ins-1"}
             if path.endswith("/credentials"):
+                self.assertEqual(payload["paymentInformation"]["instrumentIdentifier"]["id"], "7019989999909760770")
+                self.assertEqual(payload["transactionData"][0]["orderInformation"]["amountDetail"]["totalAmount"], "22.00")
                 return {
+                    "clientCorrelationId": payload["clientCorrelationId"],
+                    "transactionId": "txn-1",
                     "status": "COMPLETED",
                     "tokenizedCard": {
-                        "number": "token-card",
+                        "number": "15602cf86c70b8b63297134292ec5801",
                         "expirationMonth": "12",
                         "expirationYear": "2031",
-                        "cryptogram": "abc",
+                        "type": "001",
                     },
                 }
-            if path == "/pts/v2/payments":
-                self.assertFalse(payload["processingInformation"]["capture"])
-                return {"id": "pay-1", "status": "AUTHORIZED"}
-            if path.endswith("/reversals"):
-                return {"status": "REVERSED"}
-            if method == "PUT":
-                return {"instructionId": "ins-1"}
+            if path.endswith("/confirmations"):
+                self.assertEqual(payload["transactionData"][0]["orderInformation"]["amountDetail"]["currency"], "USD")
+                return {
+                    "clientCorrelationId": payload["clientCorrelationId"],
+                    "transactionId": "txn-1",
+                    "status": "COMPLETED",
+                    "signedPayload": "jws-signed-payload",
+                }
             raise AssertionError(path)
 
         self.app.config.update(
-            VISA_ACCEPTANCE_MERCHANT_ID="testmid",
-            VISA_ACCEPTANCE_KEY_ID="key",
-            VISA_ACCEPTANCE_SHARED_SECRET=VISA_BASELINE_SECRET,
-            VISA_ACCEPTANCE_HOST="apitest.visaacceptance.com",
-            VISA_ACCEPTANCE_TOKENIZED_CARD="enrolled-token",
+            VIC_ORG_ID="testmid",
+            VIC_API_KEY="key",
+            VIC_SHARED_SECRET=VISA_BASELINE_SECRET,
+            VIC_TOKEN_REQUESTER_ID="requester",
+            VIC_RELATIONSHIP_ID="relationship",
+            PAYMENT_PROVIDER="real_vic",
             PUBLIC_APP_URL="http://localhost:5173",
         )
-        provider = VisaAcceptanceProvider(transport=transport)
-        instruction = UserInstruction(
-            idempotency_key="booking-1",
-            item="Alfama walking tour",
-            book_ref="viator|1001P1|TG1|2026-09-27|10:00",
-            amount=22,
-            max_price=22,
-            currency="USD",
-            approval_message_id="wa-1",
+        self.assertIsInstance(get_payment_provider(), RealVICProvider)
+        provider = RealVICProvider(transport=transport)
+        billing = {
+            "firstName": "Priya",
+            "lastName": "Shah",
+            "email": "priya.shah@example.com",
+            "country": "US",
+            "countryCallingCode": "1",
+            "phoneNumber": "5550100001",
+            "paymentInformation": {"instrumentIdentifier": {"id": "7019989999909760770"}},
+        }
+        enrolled = provider.enroll_card("priya", billing, {"applicationName": "Campfire"})
+        self.assertEqual(enrolled.status, "ACTIVE")
+        purchase = {
+            "amount": "22.00",
+            "max_price": "22.00",
+            "currency": "USD",
+            "item": "Alfama walking tour",
+            "tokenized_card_number": "7019989999909760770",
+            "merchantName": "Campfire",
+            "merchantUrl": "http://localhost:5173",
+        }
+        intent = provider.initiate_purchase_intent(enrolled.instrument_id, purchase)
+        credentials = provider.retrieve_payment_credentials(intent.instruction_id)
+        self.assertEqual(credentials.token_ref, "15602cf86c70b8b63297134292ec5801")
+        confirmed = provider.confirm_transaction(
+            intent.instruction_id,
+            {"type": "PURCHASE", "totalAmount": "22.00", "currency": "USD", "merchantName": "Campfire", "merchantUrl": "http://localhost:5173"},
         )
-        approved = provider.authorize(token_ref="7019989999909760770", instruction=instruction)
-        self.assertTrue(approved.approved)
-        self.assertEqual(approved.authorization_ref, "payment:pay-1|instruction:ins-1")
-        voided = provider.void(token_ref="7019989999909760770", authorization_ref=approved.authorization_ref)
-        self.assertTrue(voided["voided"])
-        self.assertEqual([call[0] for call in calls], ["POST", "POST", "POST", "POST", "PUT"])
+        self.assertEqual(confirmed.status, "COMPLETED")
+        self.assertEqual(
+            [path for _method, path, _payload in calls],
+            [
+                "/acp/v1/tokens",
+                "/acp/v1/instructions",
+                "/acp/v1/instructions/ins-1/credentials",
+                "/acp/v1/instructions/ins-1/confirmations",
+            ],
+        )
 
     def test_viator_search_and_quote_map_sandbox_fixture(self):
         day = date(2026, 9, 27)

@@ -1398,6 +1398,200 @@ button {
   line-height: 1.25;
 }
 
+.plan-wallet {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 14px 16px 14px 18px;
+  background: var(--parchment);
+  border: 1.5px solid var(--bark-dark);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 rgba(59, 36, 22, 0.22);
+  position: relative;
+}
+
+.plan-wallet::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 12px;
+  bottom: 12px;
+  border-left: 2px dashed var(--wood-light);
+}
+
+.plan-wallet-title {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+}
+
+.plan-wallet-meta,
+.plan-wallet-limit,
+.plan-place,
+.plan-note {
+  display: block;
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bark);
+}
+
+.plan-wallet-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.plan-chip {
+  padding: 3px 8px;
+  border: 1.5px solid var(--bark-dark);
+  border-radius: 999px;
+  background: var(--fire-yellow);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.plan-trip + .plan-trip {
+  margin-top: 18px;
+}
+
+.plan-trip h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.plan-place {
+  margin-bottom: 10px;
+}
+
+.plan-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--bark-dark);
+  border-radius: 10px;
+  background: var(--cream);
+  box-shadow: 3px 3px 0 rgba(59, 36, 22, 0.16);
+}
+
+.plan-row.is-quiet {
+  opacity: 0.72;
+}
+
+.plan-row-main {
+  min-width: 0;
+}
+
+.plan-row-main strong {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.plan-row-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.plan-price {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.plan-status {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1.5px solid var(--bark-dark);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.plan-status.is-wait {
+  background: var(--fire-yellow);
+}
+
+.plan-status.is-go {
+  background: var(--fire-orange);
+}
+
+.plan-status.is-done {
+  background: var(--pine);
+  color: var(--cream);
+}
+
+.plan-status.is-no {
+  background: transparent;
+  color: var(--bark);
+}
+
+.plan-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.plan-steps li {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--wood);
+}
+
+.plan-steps li.is-done {
+  color: var(--bark);
+}
+
+.plan-steps li.is-done::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--fire-orange);
+  box-shadow: 0 0 0 1.5px var(--bark-dark);
+}
+
+.plans-empty {
+  padding-top: 8px;
+}
+
 .quest-big {
   padding: 14px 16px;
   border: 1.5px solid var(--bark-dark);

@@ -28,6 +28,7 @@ export const verifyCode = (phone, code) => send('/auth/verify', { method: 'POST'
 export const signOut = () => send('/auth/logout', { method: 'POST', body: {} });
 export const getMe = () => send('/me');
 export const listMyTrips = () => send('/trips');
+export const listBookings = () => send('/bookings');
 export const getTripPlayback = (tripId) => send(`/trips/${tripId}/playback`);
 export const endNight = (tripId) => send(`/trips/${tripId}/end-night`, { method: 'POST', body: {} });
 export const sendTripPoll = (tripId) => send(`/trips/${tripId}/poll`, { method: 'POST', body: {} });

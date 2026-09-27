@@ -12,6 +12,7 @@ import DesertTrip from './windows/DesertTrip.jsx';
 import StoryPlayer from './windows/StoryPlayer.jsx';
 import NextFire from './windows/NextFire.jsx';
 import { NightlyRecaps, OffTheRecord, Settings, SideQuests, StartTrip } from './windows/Extras.jsx';
+import Plans from './windows/Plans.jsx';
 import { KYOTO_TRIP } from './scenes/kyoto/index.js';
 import { useMyTrips, usePlayback } from './auth/useMyTrips.js';
 import { endNight } from './auth/authApi.js';
@@ -41,6 +42,7 @@ const WINDOWS = {
   fires: { title: 'Your fires', width: 640, pos: centered(640, 84), Body: YourFires },
   trip: { title: 'Desert trip', width: 560, pos: { x: 128, y: 78 }, Body: DesertTrip },
   kyoto: { title: KYOTO_TRIP.title, width: 560, pos: { x: 168, y: 98 }, Body: KYOTO_TRIP.Body },
+  plans: { title: 'Plans', width: 520, pos: fromRight(520, 88), Body: Plans },
   nightly: { title: 'Nightly recaps', width: 460, pos: { x: 190, y: 120 }, Body: NightlyRecaps },
   quests: { title: 'Side quests', width: 440, pos: { x: 230, y: 160 }, Body: SideQuests },
   next: { title: 'Next fire', width: 520, pos: fromRight(520, 96), Body: NextFire },

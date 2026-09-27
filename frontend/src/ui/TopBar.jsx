@@ -59,6 +59,11 @@ function MobileTopBar({ onOpen, canOpen, onEndNight, endingNight, nightNote }) {
           <button type="button" role="menuitem" onClick={() => go('fires')}>
             Trips
           </button>
+          {canOpen('plans') && (
+            <button type="button" role="menuitem" onClick={() => go('plans')}>
+              Plans
+            </button>
+          )}
           {canOpen('next') && (
             <button type="button" role="menuitem" onClick={() => go('next')}>
               Next fire

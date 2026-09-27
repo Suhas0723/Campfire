@@ -3,7 +3,7 @@ import uuid
 from datetime import date, datetime, timezone
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -216,6 +216,9 @@ class PaymentToken(db.Model):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, unique=True, index=True)
     token_ref: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    provider: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="mock_vic", server_default=text("'mock_vic'")
+    )
     spend_limit: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

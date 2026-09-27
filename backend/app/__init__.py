@@ -32,6 +32,7 @@ def create_app():
         logger.warning("SECRET_KEY is the default; set a real one so session cookies can't be forged")
 
     from app.api.auth import bp as auth_bp
+    from app.api.bookings import bp as bookings_bp
     from app.api.health import bp as health_bp
     from app.api.media import bp as media_bp
     from app.api.trips import bp as trips_bp
@@ -39,6 +40,7 @@ def create_app():
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp, url_prefix="/api")
     app.register_blueprint(trips_bp, url_prefix="/api")
+    app.register_blueprint(bookings_bp, url_prefix="/api")
     app.register_blueprint(media_bp, url_prefix="/api")
 
     with app.app_context():
@@ -69,6 +71,11 @@ def init_database(seed_demo: bool = False):
                 db.session.execute(
                     text(
                         "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ"
+                    )
+                )
+                db.session.execute(
+                    text(
+                        "ALTER TABLE payment_tokens ADD COLUMN IF NOT EXISTS provider VARCHAR(32) NOT NULL DEFAULT 'mock_vic'"
                     )
                 )
                 if seed_demo:

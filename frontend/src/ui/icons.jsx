@@ -138,7 +138,7 @@ export function BookIcon(p) {
 export function CloseIcon({ size = 12 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 12 12" aria-hidden="true">
-      <path d="M2,2.4 C4.5,4.8 7,7.4 10,9.8 M9.8,2 C7.4,4.6 4.8,7.2 2.2,10" style={{ ...OUT, fill: 'none' }} strokeWidth={2.2} />
+      <path d="M3.2,3.2 L8.8,8.8 M8.8,3.2 L3.2,8.8" style={{ ...OUT, fill: 'none' }} strokeWidth={1.8} />
     </svg>
   );
 }

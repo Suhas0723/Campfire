@@ -27,6 +27,10 @@ celery.conf.update(
             "task": "campfire.send_due_anniversaries",
             "schedule": crontab(hour=9, minute=0),
         },
+        "booking-proposal-expiry": {
+            "task": "campfire.expire_booking_proposals",
+            "schedule": crontab(minute=5),
+        },
     },
 )
 

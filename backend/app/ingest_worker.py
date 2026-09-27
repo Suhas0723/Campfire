@@ -29,12 +29,19 @@ def main() -> None:
             response = connection.xreadgroup(
                 INBOUND_GROUP,
                 "ingest-1",
-                {INBOUND_STREAM: ">"},
+                {INBOUND_STREAM: "0"},
                 count=10,
-                block=5000,
             )
             if not response:
-                continue
+                response = connection.xreadgroup(
+                    INBOUND_GROUP,
+                    "ingest-1",
+                    {INBOUND_STREAM: ">"},
+                    count=10,
+                    block=5000,
+                )
+                if not response:
+                    continue
             for _stream, messages in response:
                 for message_id, fields in messages:
                     try:

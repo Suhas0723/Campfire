@@ -6,6 +6,7 @@ from app.celery_app import celery
 from app.extensions import db
 from app.models import ENDED, Message, Trip
 from app.services.llm import IntegrationNotConfigured
+from app.services.bookings import book_and_pay, expire_proposals
 from app.services.story import assemble_full, end_night_now, run_due_recaps
 from app.services.transcription import transcribe
 
@@ -66,6 +67,18 @@ def end_night(trip_id: str) -> dict:
 def assemble_full_story(trip_id: str) -> None:
     """Write the end-of-trip story the playback page reads."""
     assemble_full(trip_id)
+
+
+@celery.task(name="campfire.book_and_pay")
+def book_and_pay_task(booking_id: str) -> None:
+    """Book exactly once after an explicit, audited chat approval."""
+    book_and_pay(booking_id)
+
+
+@celery.task(name="campfire.expire_booking_proposals")
+def expire_booking_proposals() -> int:
+    """Fail closed when a proposal passes its local morning cutoff."""
+    return expire_proposals()
 
 
 @celery.task(name="campfire.send_due_anniversaries")

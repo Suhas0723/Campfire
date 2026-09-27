@@ -32,6 +32,7 @@ function extensionFor(mime, fallback) {
 
 function quotedId(content) {
   return (
+    content.reactionMessage?.key?.id ||
     content.extendedTextMessage?.contextInfo?.stanzaId ||
     content.imageMessage?.contextInfo?.stanzaId ||
     content.videoMessage?.contextInfo?.stanzaId ||

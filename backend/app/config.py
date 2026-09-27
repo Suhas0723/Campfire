@@ -34,6 +34,12 @@ class Config:
     EMBEDDING_DIM = int(os.environ.get("EMBEDDING_DIM", "1536"))
     DEFAULT_TRIP_TIMEZONE = os.environ.get("DEFAULT_TRIP_TIMEZONE", "America/Los_Angeles")
     RECAP_HOUR = int(os.environ.get("RECAP_HOUR", "21"))
+    BOOKING_CUTOFF_HOUR = int(os.environ.get("BOOKING_CUTOFF_HOUR", "9"))
+    BOOKING_CURRENCY = os.environ.get("BOOKING_CURRENCY", "USD").upper()
+    ACTIVITY_PROVIDER = os.environ.get("ACTIVITY_PROVIDER", "mock")
+    PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "mock_vic")
+    MOCK_ACTIVITY_REPRICE_DELTA = float(os.environ.get("MOCK_ACTIVITY_REPRICE_DELTA", "0"))
+    MOCK_VIC_DECLINE = os.environ.get("MOCK_VIC_DECLINE", "false").strip().lower() in {"1", "true", "yes"}
     DEMO_MODE = os.environ.get("DEMO_MODE", "false").strip().lower() in {"1", "true", "yes"}
     SESSION_COOKIE_NAME = "campfire_session"
     SESSION_COOKIE_HTTPONLY = True

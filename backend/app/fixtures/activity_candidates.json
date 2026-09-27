@@ -1,0 +1,11 @@
+[
+  {"name":"Old Town walking tour","item_type":"activity","price":22.00,"currency":"USD","rating":4.8,"time_slot":"morning","start_time":"10:00","book_ref":"mock-walk-1000","tags":["history","walking","local"]},
+  {"name":"Harbor kayak rental","item_type":"activity","price":40.00,"currency":"USD","rating":4.7,"time_slot":"morning","start_time":"10:00","book_ref":"mock-kayak-1000","tags":["outdoors","adventure","water"]},
+  {"name":"Market breakfast tasting","item_type":"activity","price":31.00,"currency":"USD","rating":4.6,"time_slot":"morning","start_time":"09:30","book_ref":"mock-market-0930","tags":["food","local","vegetarian"]},
+  {"name":"Coastal bike tour","item_type":"activity","price":48.00,"currency":"USD","rating":4.9,"time_slot":"afternoon","start_time":"14:00","book_ref":"mock-bike-1400","tags":["outdoors","active","scenic"]},
+  {"name":"Pottery workshop","item_type":"activity","price":36.00,"currency":"USD","rating":4.7,"time_slot":"afternoon","start_time":"14:30","book_ref":"mock-pottery-1430","tags":["art","indoor","relaxed"]},
+  {"name":"Museum and tea experience","item_type":"activity","price":28.00,"currency":"USD","rating":4.5,"time_slot":"afternoon","start_time":"15:00","book_ref":"mock-museum-1500","tags":["culture","indoor","tea"]},
+  {"name":"Juniper Table dinner","item_type":"restaurant","price":35.00,"currency":"USD","rating":4.8,"time_slot":"evening","start_time":"19:00","book_ref":"mock-juniper-1900","tags":["dinner","vegetarian","gluten-free"]},
+  {"name":"Lantern House supper","item_type":"restaurant","price":44.00,"currency":"USD","rating":4.7,"time_slot":"evening","start_time":"19:30","book_ref":"mock-lantern-1930","tags":["dinner","seafood","local"]},
+  {"name":"Sunset picnic basket","item_type":"restaurant","price":29.00,"currency":"USD","rating":4.6,"time_slot":"evening","start_time":"18:30","book_ref":"mock-picnic-1830","tags":["outdoors","vegetarian","sunset"]}
+]

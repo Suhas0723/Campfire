@@ -13,6 +13,7 @@ from app.models import ACTIVE, Location, Message, Story, Suggestion, Trip, utcno
 from app.redis_streams import publish_outbound
 from app.services.llm import IntegrationNotConfigured, generate_text
 from app.services.memory import recall, remember
+from app.services.bookings import propose_itinerary
 from app.services.muse import (
     analyze_day_vibe,
     format_spoken_tomorrow,
@@ -364,6 +365,7 @@ def _fill_nightly(story_id: str) -> None:
     dietary = _resolve_dietary(trip, vibe)
     location = _resolve_location(trip, segments)
     muse_result = None
+    itinerary = None
     if location:
         muse_result = suggest_tonight(
             location=location,
@@ -372,8 +374,21 @@ def _fill_nightly(story_id: str) -> None:
             day_summary=vibe.get("summary") or "",
         )
     if muse_result:
-        tomorrow_text = format_spoken_tomorrow(muse_result)
-        spoken_path, voice_map = _spoken_audio(_speak(tomorrow_text, f"{story.id}-tomorrow"))
+        try:
+            with db.session.begin_nested():
+                itinerary = propose_itinerary(
+                    trip=trip,
+                    day=story.for_date,
+                    location=location,
+                    suggestion_text=format_whatsapp_text(muse_result),
+                )
+                tomorrow_text = itinerary["spoken"]
+                spoken_path, voice_map = _spoken_audio(_speak(tomorrow_text, f"{story.id}-tomorrow"))
+        except Exception:
+            logger.exception("Bookable itinerary failed; keeping the existing Muse suggestion")
+            itinerary = None
+            tomorrow_text = format_spoken_tomorrow(muse_result)
+            spoken_path, voice_map = _spoken_audio(_speak(tomorrow_text, f"{story.id}-tomorrow"))
         voice_urls = {key: _media_url(path) for key, path in voice_map.items()} if voice_map else None
         segments.append(
             _segment(
@@ -414,8 +429,13 @@ def _fill_nightly(story_id: str) -> None:
     _upsert_locations(trip, segments)
     db.session.commit()
     if recap_path:
-        _post_audio(group_jid, "Here's tonight's campfire.", recap_path)
-    if muse_result:
+        post_text = "Here's tonight's campfire."
+        client_ref = None
+        if itinerary:
+            post_text += f"\n\n{itinerary['summary']}"
+            client_ref = f"itinerary:{itinerary['proposal_ref']}"
+        _post_audio(group_jid, post_text, recap_path, client_ref=client_ref)
+    if muse_result and not itinerary:
         try:
             publish_outbound(group_jid, message_type="text", text=format_whatsapp_text(muse_result))
         except Exception:
@@ -680,9 +700,9 @@ def _upsert_locations(trip: Trip, segments: list[dict]) -> None:
         known.add(place["name"].casefold())
 
 
-def _post_audio(group_jid: str, text: str, audio_path: str) -> None:
+def _post_audio(group_jid: str, text: str, audio_path: str, *, client_ref: str | None = None) -> None:
     try:
-        publish_outbound(group_jid, message_type="text", text=text)
+        publish_outbound(group_jid, message_type="text", text=text, client_ref=client_ref)
         publish_outbound(group_jid, message_type="audio", audio_path=audio_path)
     except Exception:
         logger.exception("Story is saved but the voice note did not send")

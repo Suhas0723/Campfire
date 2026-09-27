@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.extensions import db
 from app.models import ACTIVE, ENDED, PAUSED, Group, Message, Trip, User
 from app.redis_streams import publish_outbound
+from app.services.bookings import bind_outbound_message, handle_approval
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,15 @@ def parse_command(text: str) -> str | None:
 
 
 def handle_inbound(payload: dict) -> None:
+    if payload.get("type") == "outbound_sent":
+        bind_outbound_message(payload)
+        return
     if payload.get("direct"):
         logger.info("Side-quest reply from %s is waiting on a handler", payload.get("sender_jid"))
         return
 
+    if handle_approval(payload):
+        return
     command = parse_command(payload.get("text") or "")
     if command:
         _handle_command(payload, command)

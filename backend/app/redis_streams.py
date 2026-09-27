@@ -22,6 +22,7 @@ def publish_outbound(
     text: str | None = None,
     audio_path: str | None = None,
     poll: dict | None = None,
+    client_ref: str | None = None,
 ) -> None:
     payload = {
         "group_jid": group_jid,
@@ -29,6 +30,7 @@ def publish_outbound(
         "text": text,
         "audio_path": audio_path,
         "poll": poll,
+        "client_ref": client_ref,
     }
     client().xadd(OUTBOUND_STREAM, {"data": json.dumps(payload)})
 

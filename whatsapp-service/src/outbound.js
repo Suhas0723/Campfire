@@ -28,35 +28,34 @@ function resolveAudio(audioPath) {
   return path.join(mediaDir, audioPath);
 }
 
-async function sendOne(sock, payload) {
+export async function sendOne(sock, payload) {
   if (payload.type === "poll" && payload.poll) {
     const values = (payload.poll.values || []).map((value) => String(value).trim()).filter(Boolean).slice(0, 12);
     if (values.length < 2) throw new Error("Poll needs at least two options");
-    await sock.sendMessage(payload.group_jid, {
+    return sock.sendMessage(payload.group_jid, {
       poll: {
         name: String(payload.poll.name || "Where should the next fire be?").slice(0, 255),
         values,
         selectableCount: 1,
       },
     });
-    return;
   }
   if (payload.type === "audio" && payload.audio_path) {
     const audio = await fs.readFile(resolveAudio(payload.audio_path));
     const opus = String(payload.audio_path).toLowerCase().endsWith(".ogg");
-    await sock.sendMessage(payload.group_jid, {
+    return sock.sendMessage(payload.group_jid, {
       audio,
       mimetype: opus ? "audio/ogg; codecs=opus" : "audio/mpeg",
       ptt: opus,
     });
-    return;
   }
   if (payload.text) {
-    await sock.sendMessage(payload.group_jid, { text: payload.text });
+    return sock.sendMessage(payload.group_jid, { text: payload.text });
   }
+  return null;
 }
 
-async function deliverBatch(redis, getSocket, offset) {
+export async function deliverBatch(redis, getSocket, offset) {
   const rows = await redis.xreadgroup(
     "GROUP",
     outboundGroup,
@@ -77,7 +76,18 @@ async function deliverBatch(redis, getSocket, offset) {
       if (!socket) return false;
       const data = fieldsToObject(flat).data;
       try {
-        await sendOne(socket, JSON.parse(data || "{}"));
+        const payload = JSON.parse(data || "{}");
+        const sent = await sendOne(socket, payload);
+        if (payload.client_ref && sent?.key?.id) {
+          await redis.xadd(inboundStream, "*", "data", JSON.stringify({
+            group_jid: payload.group_jid,
+            message_id: sent.key.id,
+            timestamp: Math.floor(Date.now() / 1000),
+            type: "outbound_sent",
+            client_ref: payload.client_ref,
+            direct: false,
+          }));
+        }
         await redis.xack(outboundStream, outboundGroup, id);
       } catch (err) {
         delivered = false;

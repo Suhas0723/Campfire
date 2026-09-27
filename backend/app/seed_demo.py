@@ -10,7 +10,7 @@ from pathlib import Path
 
 from app.auth import phone_to_jid
 from app.extensions import db
-from app.models import ACTIVE, Group, Location, Story, Suggestion, Trip, User
+from app.models import ACTIVE, Group, Location, PaymentToken, Story, Suggestion, Trip, User
 
 DEMO_DIR = Path(__file__).resolve().parent / "demo"
 
@@ -107,6 +107,19 @@ def seed() -> None:
                 Suggestion(trip=trip, body=item["body"], rationale=item.get("rationale", ""), choices=choices[:11])
             )
         db.session.flush()
+
+    for name in ("Priya", "Dev", "Marcus"):
+        user = _user(name)
+        db.session.flush()
+        if db.session.query(PaymentToken).filter_by(user_id=user.id).one_or_none() is None:
+            db.session.add(
+                PaymentToken(
+                    user_id=user.id,
+                    token_ref=f"vic-demo-{name.casefold()}",
+                    spend_limit=500,
+                    currency="USD",
+                )
+            )
 
 
 def main() -> None:

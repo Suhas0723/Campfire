@@ -3,7 +3,7 @@ import uuid
 from datetime import date, datetime, timezone
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,6 +39,8 @@ class User(db.Model):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
+    payment_token: Mapped["PaymentToken | None"] = relationship(back_populates="user", uselist=False)
+
 
 trip_participants = db.Table(
     "trip_participants",
@@ -66,6 +68,7 @@ class Trip(db.Model):
     locations: Mapped[list["Location"]] = relationship(back_populates="trip")
     stories: Mapped[list["Story"]] = relationship(back_populates="trip")
     suggestions: Mapped[list["Suggestion"]] = relationship(back_populates="trip")
+    bookings: Mapped[list["Booking"]] = relationship(back_populates="trip")
 
     def crew(self) -> list[str]:
         order = (self.details or {}).get("crew_order") or []
@@ -180,3 +183,60 @@ class SideQuest(db.Model):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     participants: Mapped[list[User]] = relationship(secondary=side_quest_participants)
+
+
+class Booking(db.Model):
+    __tablename__ = "bookings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trip_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trips.id"), nullable=False, index=True)
+    item_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    time_slot: Mapped[str] = mapped_column(String(32), nullable=False)
+    candidate_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="proposed", index=True)
+    proposal_ref: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    proposal_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    approved_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    approval_deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    trip: Mapped[Trip] = relationship(back_populates="bookings")
+    audit_logs: Mapped[list["BookingAuditLog"]] = relationship(back_populates="booking")
+
+
+class PaymentToken(db.Model):
+    __tablename__ = "payment_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    token_ref: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    spend_limit: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="payment_token")
+
+
+class BookingAuditLog(db.Model):
+    __tablename__ = "booking_audit_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bookings.id"), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    actor_jid: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    approval_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    approval_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    provider_request: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    provider_response: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    booking: Mapped[Booking] = relationship(back_populates="audit_logs")

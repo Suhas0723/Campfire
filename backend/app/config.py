@@ -40,6 +40,17 @@ class Config:
     PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "mock_vic")
     MOCK_ACTIVITY_REPRICE_DELTA = float(os.environ.get("MOCK_ACTIVITY_REPRICE_DELTA", "0"))
     MOCK_VIC_DECLINE = os.environ.get("MOCK_VIC_DECLINE", "false").strip().lower() in {"1", "true", "yes"}
+    VISA_ACCEPTANCE_MERCHANT_ID = os.environ.get("VISA_ACCEPTANCE_MERCHANT_ID", "")
+    VISA_ACCEPTANCE_KEY_ID = os.environ.get("VISA_ACCEPTANCE_KEY_ID", "")
+    VISA_ACCEPTANCE_SHARED_SECRET = os.environ.get("VISA_ACCEPTANCE_SHARED_SECRET", "")
+    VISA_ACCEPTANCE_HOST = os.environ.get("VISA_ACCEPTANCE_HOST", "apitest.visaacceptance.com")
+    VISA_ACCEPTANCE_TOKENIZED_CARD = os.environ.get("VISA_ACCEPTANCE_TOKENIZED_CARD", "")
+    VIATOR_API_KEY = os.environ.get("VIATOR_API_KEY", "")
+    VIATOR_API_BASE_URL = os.environ.get("VIATOR_API_BASE_URL", "https://api.sandbox.viator.com/partner").rstrip("/")
+    VIATOR_BOOKER_EMAIL = os.environ.get("VIATOR_BOOKER_EMAIL", "")
+    VIATOR_BOOKER_FIRST_NAME = os.environ.get("VIATOR_BOOKER_FIRST_NAME", "")
+    VIATOR_BOOKER_LAST_NAME = os.environ.get("VIATOR_BOOKER_LAST_NAME", "")
+    VIATOR_BOOKER_PHONE = os.environ.get("VIATOR_BOOKER_PHONE", "")
     DEMO_MODE = os.environ.get("DEMO_MODE", "false").strip().lower() in {"1", "true", "yes"}
     SESSION_COOKIE_NAME = "campfire_session"
     SESSION_COOKIE_HTTPONLY = True

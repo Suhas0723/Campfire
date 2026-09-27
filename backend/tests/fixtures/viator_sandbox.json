@@ -1,0 +1,75 @@
+{
+  "destinations": {
+    "destinations": [
+      {"destinationId": 538, "name": "Lisbon", "type": "CITY"}
+    ]
+  },
+  "search": {
+    "products": [
+      {
+        "productCode": "1001P1",
+        "title": "Alfama walking tour",
+        "reviews": {"combinedAverageRating": 4.8},
+        "pricing": {"currency": "USD", "summary": {"fromPrice": 22.0}},
+        "flags": ["FREE_CANCELLATION"]
+      },
+      {
+        "productCode": "1002P2",
+        "title": "Coastal bike tour",
+        "reviews": {"combinedAverageRating": 4.6},
+        "pricing": {"currency": "USD", "summary": {"fromPrice": 48.0}},
+        "flags": ["OUTDOORS"]
+      }
+    ]
+  },
+  "schedules": {
+    "1001P1": {
+      "currency": "USD",
+      "bookableItems": [
+        {
+          "productOptionCode": "TG1",
+          "seasons": [
+            {
+              "startDate": "2026-01-01",
+              "endDate": "2026-12-31",
+              "pricingRecords": [
+                {
+                  "timedEntries": [{"startTime": "10:00"}],
+                  "pricingDetails": [
+                    {"ageBand": "ADULT", "price": {"original": {"recommendedRetailPrice": 22.0}}}
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "1002P2": {
+      "currency": "EUR",
+      "bookableItems": [
+        {
+          "productOptionCode": "TG4",
+          "seasons": [
+            {
+              "startDate": "2026-01-01",
+              "pricingRecords": [
+                {
+                  "timedEntries": [{"startTime": "14:00"}],
+                  "pricingDetails": [
+                    {"ageBand": "ADULT", "price": {"original": {"recommendedRetailPrice": 40.0}}}
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "rates": {
+    "rates": [
+      {"sourceCurrency": "EUR", "targetCurrency": "USD", "rate": 1.1}
+    ]
+  }
+}

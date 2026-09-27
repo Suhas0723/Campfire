@@ -38,6 +38,8 @@ def _process(connection: redis.Redis, response) -> None:
                 db.session.rollback()
             else:
                 connection.xack(INBOUND_STREAM, INBOUND_GROUP, message_id)
+            finally:
+                db.session.remove()
 
 
 def main() -> None:

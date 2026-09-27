@@ -1,5 +1,6 @@
 from celery import Celery, Task
 from celery.schedules import crontab
+from celery.signals import worker_process_init
 
 from app import create_app
 
@@ -13,6 +14,17 @@ class FlaskTask(Task):
 
 
 celery = Celery("campfire", task_cls=FlaskTask)
+
+
+@worker_process_init.connect
+def _dispose_db_after_fork(**_kwargs):
+    """Workers fork after create_app() has opened Postgres. Drop that inherited connection."""
+    from app.extensions import db
+
+    with flask_app.app_context():
+        db.engine.dispose()
+
+
 celery.conf.update(
     broker_url=flask_app.config["CELERY_BROKER_URL"],
     result_backend=flask_app.config["CELERY_RESULT_BACKEND"],

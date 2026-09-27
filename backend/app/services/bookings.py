@@ -9,7 +9,8 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from flask import current_app
-from sqlalchemy import or_
+from sqlalchemy import or_, update
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
 from app.models import ACTIVE, Booking, BookingAuditLog, PaymentToken, Trip, User
@@ -97,10 +98,15 @@ def bind_outbound_message(payload: dict) -> None:
     message_id = str(payload.get("message_id") or "")
     if not proposal_ref or not message_id:
         return
-    (
-        db.session.query(Booking)
-        .filter_by(proposal_ref=proposal_ref, status="proposed", proposal_message_id=None)
-        .update({"proposal_message_id": message_id}, synchronize_session=False)
+    db.session.execute(
+        update(Booking)
+        .where(
+            Booking.proposal_ref == proposal_ref,
+            Booking.status == "proposed",
+            Booking.proposal_message_id.is_(None),
+        )
+        .values(proposal_message_id=message_id),
+        execution_options={"synchronize_session": False},
     )
     db.session.commit()
 
@@ -211,11 +217,45 @@ def book_and_pay(booking_id: str) -> None:
         key = uuid.UUID(booking_id)
     except ValueError:
         return
+    if not _claim_for_payment(key):
+        return
+    error: Exception | None = None
+    for _attempt in (1, 2):
+        try:
+            booking = db.session.get(Booking, key)
+            if booking is None or booking.status in ("confirmed", "declined"):
+                return
+            _complete_booking(booking)
+            return
+        except SQLAlchemyError as exc:
+            # A forked Celery worker can inherit a closed DB result from startup.
+            # Drop that connection and run the booking once more before telling the chat.
+            error = exc
+            logger.exception("Booking save failed for %s", booking_id)
+            db.session.rollback()
+            db.session.remove()
+            db.engine.dispose()
+        except Exception as exc:
+            error = exc
+            logger.exception("Booking failed for %s", booking_id)
+            db.session.rollback()
+            break
+    booking = db.session.get(Booking, key)
+    if booking is None or booking.status in ("confirmed", "declined"):
+        return
+    if isinstance(error, SQLAlchemyError):
+        _decline(booking, "Saving the booking failed before it was confirmed.")
+    else:
+        _decline(booking, f"provider_error: {error}")
+
+
+def _claim_for_payment(key: uuid.UUID) -> bool:
+    """Move one approved booking to booked. Read only the row count, never the update result."""
     now = datetime.now(timezone.utc)
     stale = now - timedelta(minutes=5)
-    claimed = (
-        db.session.query(Booking)
-        .filter(
+    result = db.session.execute(
+        update(Booking)
+        .where(
             Booking.id == key,
             or_(
                 Booking.status == "approved",
@@ -225,20 +265,12 @@ def book_and_pay(booking_id: str) -> None:
                 ),
             ),
         )
-        .update({"status": "booked", "processing_started_at": now}, synchronize_session=False)
+        .values(status="booked", processing_started_at=now),
+        execution_options={"synchronize_session": False},
     )
+    claimed = result.rowcount
     db.session.commit()
-    if claimed != 1:
-        return
-    booking = db.session.get(Booking, key)
-    try:
-        _complete_booking(booking)
-    except Exception as exc:
-        logger.exception("Booking failed for %s", booking_id)
-        db.session.rollback()
-        booking = db.session.get(Booking, key)
-        if booking is not None and booking.status not in ("confirmed", "declined"):
-            _decline(booking, f"provider_error: {exc}")
+    return claimed == 1
 
 
 def _complete_booking(booking: Booking) -> None:

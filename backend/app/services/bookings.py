@@ -273,13 +273,52 @@ def _claim_for_payment(key: uuid.UUID) -> bool:
     return claimed == 1
 
 
+_MOCK_SPEND_LIMIT = Decimal("500.00")
+
+
+def _payment_token(booking: Booking) -> PaymentToken | None:
+    """Return the approver's token, enrolling a mock Visa token when that provider is active."""
+    jid = booking.approved_by
+    if not jid:
+        return None
+    user = db.session.query(User).filter_by(whatsapp_jid=jid).one_or_none()
+    if user is None:
+        user = User(whatsapp_jid=jid, display_name=jid.split("@", 1)[0])
+        db.session.add(user)
+        db.session.flush()
+    token = db.session.query(PaymentToken).filter_by(user_id=user.id).one_or_none()
+    if token is not None:
+        return token
+    if str(current_app.config.get("PAYMENT_PROVIDER", "mock_vic")).casefold() != "mock_vic":
+        return None
+    token = PaymentToken(
+        user=user,
+        token_ref=f"vic-mock-{user.id}",
+        spend_limit=_MOCK_SPEND_LIMIT,
+        currency=current_app.config["BOOKING_CURRENCY"],
+    )
+    db.session.add(token)
+    db.session.flush()
+    _audit(
+        booking,
+        "token_enrolled",
+        actor_jid=jid,
+        provider_response={
+            "token_ref": token.token_ref,
+            "spend_limit": str(_MOCK_SPEND_LIMIT),
+            "currency": token.currency,
+        },
+    )
+    return token
+
+
 def _complete_booking(booking: Booking) -> None:
     candidate = dict(booking.candidate_json or {})
-    user = db.session.query(User).filter_by(whatsapp_jid=booking.approved_by).one_or_none()
-    token = db.session.query(PaymentToken).filter_by(user_id=user.id).one_or_none() if user else None
+    token = _payment_token(booking)
     if token is None:
         _decline(booking, "No enrolled payment token for the approving traveler.")
         return
+    user = token.user
     approved_price = float(candidate["price"])
     quote = get_activity_provider().quote(str(candidate["book_ref"]))
     if quote.currency != candidate.get("currency") or quote.price > approved_price:

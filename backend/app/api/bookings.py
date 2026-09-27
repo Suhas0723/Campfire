@@ -88,7 +88,13 @@ def _names_for(jids: set[str]) -> dict[str, str]:
 def _booking_payload(booking: Booking, names: dict[str, str]) -> dict:
     candidate = booking.candidate_json or {}
     note = None
-    if booking.status == "declined" and booking.last_error and len(booking.last_error) <= 180:
+    price_known = candidate.get("price") is not None and candidate.get("price") != ""
+    if booking.status == "suggested":
+        why = str(candidate.get("why") or "").strip()
+        diet = str(candidate.get("diet_fit") or "").strip()
+        price_note = str(candidate.get("price_note") or "").strip()
+        note = " ".join(part for part in (why, diet, price_note) if part)[:240] or None
+    elif booking.status == "declined" and booking.last_error and len(booking.last_error) <= 180:
         note = booking.last_error
     return {
         "id": str(booking.id),
@@ -96,8 +102,11 @@ def _booking_payload(booking: Booking, names: dict[str, str]) -> dict:
         "item_type": booking.item_type,
         "time_slot": booking.time_slot,
         "start_time": candidate.get("start_time") or "",
-        "price": float(candidate.get("price") or 0),
+        "price": float(candidate.get("price")) if price_known else None,
+        "price_estimated": bool(candidate.get("price_estimated")) and price_known,
         "currency": candidate.get("currency") or "USD",
+        "url": str(candidate.get("url") or ""),
+        "link_label": "Reserve" if booking.item_type == "restaurant" else "Tickets",
         "status": booking.status,
         "is_primary": bool(booking.is_primary),
         "approval_deadline": booking.approval_deadline.isoformat() if booking.approval_deadline else None,

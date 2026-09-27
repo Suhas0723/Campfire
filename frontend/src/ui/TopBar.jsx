@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CompassIcon, FlameLogo, LanternIcon, TentIcon } from './icons.jsx';
+import { CompassIcon, FlameLogo, LanternIcon, TentIcon, TicketIcon } from './icons.jsx';
 import UserMenu from '../auth/UserMenu.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import useIsMobile from './useIsMobile.js';
 
 const HEADER_NAV = [
   { id: 'fires', label: 'Your fires', Icon: TentIcon },
+  { id: 'plans', label: 'Plans', Icon: TicketIcon },
   { id: 'next', label: 'Next fire', Icon: CompassIcon },
   { id: 'settings', label: 'Settings', Icon: LanternIcon },
 ];
@@ -96,25 +97,31 @@ export default function TopBar({ onOpen, canOpen = () => true, onEndNight, endin
   }
   return (
     <header className="topbar">
-      <button className="brand" onClick={() => onOpen('fires')}>
-        <FlameLogo size={28} />
-        <span>Campfire</span>
-      </button>
-      <nav className="topnav" aria-label="Main">
-        {HEADER_NAV.filter((item) => canOpen(item.id)).map(({ id, label, Icon }) => (
-          <button key={id} className="topnav-link topnav-item" onClick={() => onOpen(id)}>
-            <Icon size={26} />
-            {label}
-          </button>
-        ))}
-      </nav>
+      <div className="topbar-main">
+        <button className="brand" onClick={() => onOpen('fires')}>
+          <FlameLogo size={28} />
+          <span className="brand-name">Campfire</span>
+        </button>
+        <nav className="topnav" aria-label="Main">
+          {HEADER_NAV.filter((item) => canOpen(item.id)).map(({ id, label, Icon }) => (
+            <button key={id} className="topnav-link topnav-item" title={label} onClick={() => onOpen(id)}>
+              <Icon size={26} />
+              <span className="topnav-label">{label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
       <div className="topbar-right">
         {onEndNight && (
-          <button className="btn-night" type="button" onClick={onEndNight} disabled={endingNight}>
+          <button className="btn-night" type="button" title={nightNote || undefined} onClick={onEndNight} disabled={endingNight}>
             {endingNight ? 'Ending the night…' : 'End the night'}
           </button>
         )}
-        {nightNote && <span className="night-note">{nightNote}</span>}
+        {nightNote && (
+          <span className="night-note" title={nightNote}>
+            {nightNote}
+          </span>
+        )}
         <button className="btn-primary" onClick={() => onOpen('start')}>
           Start a trip
         </button>

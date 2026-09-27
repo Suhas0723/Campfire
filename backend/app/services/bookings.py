@@ -17,6 +17,7 @@ from app.redis_streams import publish_outbound
 from app.services.activities import get_activity_provider
 from app.services.llm import generate_text
 from app.services.memory import recall
+from app.services.muse import lookup_plan_page
 from app.services.payments import NotConfiguredError, PaymentDeclinedError, get_payment_provider
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,87 @@ _BUNDLE_APPROVALS = {
 }
 _ITEM_APPROVAL = re.compile(r"^(?:approve|book)(?:\s+the)?\s+(.+)$", re.IGNORECASE)
 _THUMBS_UP = re.compile(r"^👍[\U0001F3FB-\U0001F3FF]?$")
+
+
+_KIND_SLOTS = {
+    "activity": ("morning", "afternoon"),
+    "fun": ("afternoon", "morning"),
+    "restaurant": ("evening",),
+}
+
+
+def propose_nearby_plans(*, trip: Trip, day: date, location: dict, muse_result: dict) -> dict:
+    """Save Muse's nearby places as plans. This does not call Viator or charge a card."""
+    suggestions = [item for item in (muse_result.get("suggestions") or []) if str(item.get("name") or "").strip()]
+    if not suggestions:
+        raise ValueError("No nearby suggestions")
+
+    proposal_ref = str(uuid.uuid4())
+    deadline = _approval_deadline(day)
+    taken = set()
+    candidates = []
+    for item in suggestions:
+        kind = str(item.get("kind") or "fun").strip().lower()
+        if kind not in _KIND_SLOTS:
+            kind = "fun"
+        slot = _KIND_SLOTS[kind][0]
+        primary = True
+        for option in _KIND_SLOTS[kind]:
+            if option not in taken:
+                slot = option
+                break
+        else:
+            primary = False
+        if primary:
+            taken.add(slot)
+        why = " ".join(str(item.get("why") or item.get("vibe_fit") or "").split())
+        diet = " ".join(str(item.get("diet_fit") or "").split())
+        place = str((location or {}).get("name") or muse_result.get("location_name") or "")[:120]
+        offer = lookup_plan_page(name=str(item["name"]).strip(), location=place, kind=kind)
+        candidate = {
+            "name": str(item["name"]).strip()[:120],
+            "item_type": kind,
+            "time_slot": slot,
+            "why": why[:200],
+            "diet_fit": diet[:160],
+            "source": "nearby",
+            "location_name": place,
+            "url": offer.get("url") or "",
+            "price": offer.get("price"),
+            "currency": offer.get("currency") or "USD",
+            "price_estimated": offer.get("price") is not None,
+            "price_note": offer.get("price_note") or "",
+        }
+        candidates.append(candidate)
+        db.session.add(
+            Booking(
+                trip_id=trip.id,
+                item_type=kind,
+                time_slot=slot,
+                candidate_json=candidate,
+                status="suggested",
+                proposal_ref=proposal_ref,
+                is_primary=primary,
+                approval_deadline=deadline,
+            )
+        )
+    place = candidate["location_name"] if candidates else ""
+    return {
+        "proposal_ref": proposal_ref,
+        "spoken": " ".join(str(muse_result.get("spoken") or "").split())[:500],
+        "summary": _nearby_summary(candidates, place),
+        "candidates": candidates,
+    }
+
+
+def _nearby_summary(candidates: list[dict], place: str) -> str:
+    lines = [f"Tomorrow near {place}:" if place else "Tomorrow nearby:"]
+    for candidate in candidates:
+        bit = f"• {candidate['time_slot']}: {candidate['name']}"
+        if candidate.get("why"):
+            bit += f" — {candidate['why']}"
+        lines.append(bit)
+    return "\n".join(lines)
 
 
 def propose_itinerary(*, trip: Trip, day: date, location: dict, suggestion_text: str) -> dict:

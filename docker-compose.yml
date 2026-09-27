@@ -95,6 +95,7 @@ services:
   ingest:
     build: ./backend
     command: python -m app.ingest_worker
+    restart: unless-stopped
     environment: *backend_env
     volumes:
       - media_data:/data/media

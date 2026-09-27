@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 import redis
 
@@ -40,25 +41,34 @@ def _process(connection: redis.Redis, response) -> None:
                 connection.xack(INBOUND_STREAM, INBOUND_GROUP, message_id)
 
 
+def _listen() -> None:
+    connection = client()
+    _ensure_group(connection)
+    logger.info("Ingest listening on %s", INBOUND_STREAM)
+    # Entries left pending by an earlier crash are retried once at startup.
+    # New entries are always read afterwards so one failing entry cannot block the stream.
+    _process(connection, connection.xreadgroup(INBOUND_GROUP, CONSUMER, {INBOUND_STREAM: "0"}, count=10))
+    while True:
+        response = connection.xreadgroup(
+            INBOUND_GROUP,
+            CONSUMER,
+            {INBOUND_STREAM: ">"},
+            count=10,
+            block=5000,
+        )
+        if response:
+            _process(connection, response)
+
+
 def main() -> None:
     app = create_app()
     with app.app_context():
-        connection = client()
-        _ensure_group(connection)
-        logger.info("Ingest listening on %s", INBOUND_STREAM)
-        # Entries left pending by an earlier crash are retried once at startup.
-        # New entries are always read afterwards so one failing entry cannot block the stream.
-        _process(connection, connection.xreadgroup(INBOUND_GROUP, CONSUMER, {INBOUND_STREAM: "0"}, count=10))
         while True:
-            response = connection.xreadgroup(
-                INBOUND_GROUP,
-                CONSUMER,
-                {INBOUND_STREAM: ">"},
-                count=10,
-                block=5000,
-            )
-            if response:
-                _process(connection, response)
+            try:
+                _listen()
+            except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
+                logger.exception("Redis connection lost; reconnecting")
+                time.sleep(2)
 
 
 if __name__ == "__main__":

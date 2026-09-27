@@ -262,13 +262,15 @@
 /* ---------- Top bar user ---------- */
 
 .topbar-right {
-  justify-self: end;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-left: auto;
 }
 
 .btn-night {
+  flex: 0 0 auto;
   cursor: pointer;
   padding: 7px 14px 6px;
   font-weight: 800;
@@ -278,6 +280,7 @@
   border: 2px solid var(--bark-dark);
   border-bottom-width: 4px;
   border-radius: 9px;
+  white-space: nowrap;
 }
 
 .btn-night:disabled {
@@ -286,10 +289,14 @@
 }
 
 .night-note {
-  max-width: 220px;
+  flex: 0 1 180px;
+  max-width: 180px;
+  overflow: hidden;
   font-size: 13px;
   font-weight: 700;
   color: var(--bark-dark);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .user-menu {
@@ -299,7 +306,9 @@
 .user-menu-button {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 8px;
+  white-space: nowrap;
   padding: 3px 3px 3px 10px;
   border: 1.5px solid transparent;
   border-radius: 999px;

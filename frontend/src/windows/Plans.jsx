@@ -3,6 +3,7 @@ import { listBookings } from '../auth/authApi.js';
 import { FlameLogo, TicketIcon } from '../ui/icons.jsx';
 
 const STATUS = {
+  suggested: { label: 'Nearby', tone: 'go' },
   proposed: { label: 'Waiting in the chat', tone: 'wait' },
   approved: { label: 'Approved', tone: 'go' },
   booked: { label: 'Booking', tone: 'go' },
@@ -65,6 +66,7 @@ function Wallet({ payment }) {
 function PlanRow({ booking }) {
   const status = STATUS[booking.status] || { label: booking.status, tone: 'wait' };
   const quiet = booking.status === 'declined';
+  const nearby = booking.status === 'suggested';
   return (
     <li className={`plan-row${quiet ? ' is-quiet' : ''}`}>
       <div className="plan-row-main">
@@ -74,6 +76,11 @@ function PlanRow({ booking }) {
           {booking.is_primary && booking.status === 'proposed' && ' · First choice'}
         </span>
         <strong>{booking.name}</strong>
+        {nearby && booking.url && (
+          <a className="plan-link" href={booking.url} target="_blank" rel="noopener noreferrer">
+            {booking.link_label || 'Sign up'}
+          </a>
+        )}
         {booking.status === 'proposed' && <p className="plan-note">{replyBy(booking.approval_deadline)}</p>}
         {booking.confirmation_ref && (
           <p className="plan-note">
@@ -93,7 +100,9 @@ function PlanRow({ booking }) {
         )}
       </div>
       <div className="plan-row-side">
-        <span className="plan-price">{money(booking.price, booking.currency)}</span>
+        <span className="plan-price">
+          {nearby && !booking.price_estimated ? 'Price varies' : nearby ? `est. ${money(booking.price, booking.currency)}` : money(booking.price, booking.currency)}
+        </span>
         <span className={`plan-status is-${status.tone}`}>{status.label}</span>
       </div>
     </li>
@@ -139,9 +148,9 @@ export default function Plans() {
     <div className="plans">
       <div className="window-intro">
         <TicketIcon size={48} />
-        <p>Bookings for the trip, and the card that pays.</p>
+        <p>Nearby plans for the trip.</p>
       </div>
-      <Wallet payment={state.payment} />
+      {state.payment?.enrolled && <Wallet payment={state.payment} />}
       {state.trips.length === 0 ? (
         <div className="state-msg plans-empty">
           <strong>No plans yet.</strong>

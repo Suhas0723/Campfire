@@ -13,7 +13,7 @@ from app.models import ACTIVE, Location, Message, Story, Suggestion, Trip, utcno
 from app.redis_streams import publish_outbound
 from app.services.llm import IntegrationNotConfigured, generate_text
 from app.services.memory import recall, remember
-from app.services.bookings import propose_itinerary
+from app.services.bookings import propose_nearby_plans
 from app.services.muse import (
     analyze_day_vibe,
     format_spoken_tomorrow,
@@ -376,16 +376,16 @@ def _fill_nightly(story_id: str) -> None:
     if muse_result:
         try:
             with db.session.begin_nested():
-                itinerary = propose_itinerary(
+                itinerary = propose_nearby_plans(
                     trip=trip,
                     day=story.for_date,
                     location=location,
-                    suggestion_text=format_whatsapp_text(muse_result),
+                    muse_result=muse_result,
                 )
                 tomorrow_text = itinerary["spoken"]
                 spoken_path, voice_map = _spoken_audio(_speak(tomorrow_text, f"{story.id}-tomorrow"))
         except Exception:
-            logger.exception("Bookable itinerary failed; keeping the existing Muse suggestion")
+            logger.exception("Nearby plans failed; keeping the Muse suggestion as text")
             itinerary = None
             tomorrow_text = format_spoken_tomorrow(muse_result)
             spoken_path, voice_map = _spoken_audio(_speak(tomorrow_text, f"{story.id}-tomorrow"))
@@ -433,7 +433,6 @@ def _fill_nightly(story_id: str) -> None:
         client_ref = None
         if itinerary:
             post_text += f"\n\n{itinerary['summary']}"
-            client_ref = f"itinerary:{itinerary['proposal_ref']}"
         _post_audio(group_jid, post_text, recap_path, client_ref=client_ref)
     if muse_result and not itinerary:
         try:
